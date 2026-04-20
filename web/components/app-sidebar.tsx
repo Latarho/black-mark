@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { ClipboardListIcon, NetworkIcon, SettingsIcon } from "lucide-react"
 
@@ -22,9 +23,16 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-        <span className="truncate font-semibold text-sidebar-foreground">
-          Black mark
+      <SidebarHeader className="h-14 justify-center border-b border-sidebar-border px-4 py-0">
+        <span className="flex items-center gap-2 truncate font-semibold text-sidebar-foreground">
+          <Image
+            src="/jolly-roger.svg"
+            alt="Jolly Roger"
+            width={32}
+            height={32}
+            className="shrink-0"
+          />
+          <span className="truncate">Black mark</span>
         </span>
       </SidebarHeader>
       <SidebarContent>
