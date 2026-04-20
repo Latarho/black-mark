@@ -34,7 +34,7 @@ import {
 import { cn } from "@/lib/utils"
 
 const sspVspTagClass =
-  "inline-flex shrink-0 items-center rounded border border-border bg-muted/60 px-1.5 py-px text-[10px] font-semibold leading-none text-muted-foreground"
+  "inline-flex shrink-0 items-center rounded border border-border bg-muted/60 px-1.5 py-px text-sm font-semibold leading-none text-muted-foreground"
 
 function unitLabel(unit: OrgUnit): string {
   if (unit.id === ORG_ROOT.id) return "Структура"
@@ -293,7 +293,7 @@ export function StaffOrgExplorer() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="staff" className="mt-0 flex min-h-0 flex-1 flex-col">
-          <div className="grid min-h-[min(70vh,720px)] flex-1 gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
+          <div className="grid min-h-[min(70vh,720px)] min-w-0 flex-1 gap-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
             <aside className="flex min-h-0 flex-col rounded-lg border border-border bg-card">
               <div className="border-b border-border px-3 py-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">

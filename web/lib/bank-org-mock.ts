@@ -553,9 +553,24 @@ const UNIT_COUNTS: Record<string, number> = {
   "m-ops-cards": 14,
 }
 
-export const STAFF: StaffMember[] = Object.entries(UNIT_COUNTS).flatMap(
-  ([unitId, n]) => makeStaffForUnit(unitId, n)
-)
+/** Явно заданный тестовый сотрудник (помимо сгенерированных по UNIT_COUNTS). */
+const STAFF_DEMO_POMYTKIN: StaffMember = {
+  id: "staff-demo-pomytkin-so",
+  unitId: "o-it-soc",
+  lastName: "Помыткин",
+  firstName: "Сергей",
+  patronymic: "Олегович",
+  position: "Аналитик SOC",
+  personnelNumber: "91337",
+  ...demoProfileForStaff("o-it-soc", 42, hashString("staff-demo-pomytkin-so")),
+}
+
+export const STAFF: StaffMember[] = [
+  ...Object.entries(UNIT_COUNTS).flatMap(([unitId, n]) =>
+    makeStaffForUnit(unitId, n)
+  ),
+  STAFF_DEMO_POMYTKIN,
+]
 
 export function findUnit(node: OrgUnit, id: string): OrgUnit | null {
   if (node.id === id) return node

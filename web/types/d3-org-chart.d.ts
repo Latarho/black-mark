@@ -33,6 +33,9 @@ declare module "d3-org-chart" {
     }): this
     onZoom(fn: (event: { transform: { k: number; x: number; y: number } }) => void): this
     onZoomEnd(fn: (event: { transform: { k: number; x: number; y: number } }) => void): this
+    nodeUpdate(
+      fn: (this: SVGGElement, d: { width: number; height: number; data: Record<string, unknown> }, i: number, arr: unknown) => void
+    ): this
     render(): this
     clear(): void
     getChartState(): {

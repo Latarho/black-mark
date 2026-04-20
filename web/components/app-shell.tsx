@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <ThemeToggle />
           </header>
-          <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
             {children}
           </div>
         </SidebarInset>
