@@ -35,7 +35,7 @@ import {
 import { cn } from "@/lib/utils"
 
 const sspVspTagClass =
-  "inline-flex shrink-0 items-center rounded border border-border bg-muted/60 px-1.5 py-px text-sm font-semibold leading-none text-muted-foreground"
+  "inline-flex shrink-0 items-center rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-px text-sm font-semibold leading-none text-sky-700 dark:border-sky-500/45 dark:bg-sky-500/15 dark:text-sky-300"
 
 /** Тег «Руководитель» в списках и дроуере. На органиграмме — иконка `shield-user` в углу карточки. */
 const unitHeadTagClass =

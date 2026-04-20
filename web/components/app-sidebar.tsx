@@ -32,7 +32,7 @@ export function AppSidebar() {
             height={32}
             className="shrink-0"
           />
-          <span className="truncate">Black mark</span>
+          <span className="truncate">Чёрная метка</span>
         </span>
       </SidebarHeader>
       <SidebarContent>

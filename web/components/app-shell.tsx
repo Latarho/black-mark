@@ -19,7 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarInset>
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
-            <Separator orientation="vertical" className="h-6" />
+            <Separator orientation="vertical" className="h-full self-stretch" />
             <div className="min-w-0 flex-1">
               <AppBreadcrumb />
             </div>

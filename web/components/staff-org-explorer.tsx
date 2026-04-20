@@ -6,7 +6,6 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   SearchIcon,
-  UsersIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -24,7 +23,7 @@ import {
   STAFF,
   type OrgUnit,
   type StaffMember,
-  collectLeafIds,
+  collectUnitIds,
   countStaffDirect,
   countStaffInSubtree,
   findUnit,
@@ -34,7 +33,7 @@ import {
 import { cn } from "@/lib/utils"
 
 const sspVspTagClass =
-  "inline-flex shrink-0 items-center rounded border border-border bg-muted/60 px-1.5 py-px text-sm font-semibold leading-none text-muted-foreground"
+  "inline-flex shrink-0 items-center rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-px text-sm font-semibold leading-none text-sky-700 dark:border-sky-500/45 dark:bg-sky-500/15 dark:text-sky-300"
 
 function unitLabel(unit: OrgUnit): string {
   if (unit.id === ORG_ROOT.id) return "Структура"
@@ -61,6 +60,7 @@ const AVATAR_TONES = [
   "bg-chart-4/15 text-chart-4",
   "bg-chart-5/15 text-chart-5",
 ] as const
+const STAFF_TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 function staffInitials(s: StaffMember): string {
   const a = s.lastName.trim().at(0) ?? ""
@@ -111,7 +111,6 @@ function TreeNodeRow({
   const q = unitQuery.trim().toLowerCase()
 
   const subtree = React.useMemo(() => countStaffInSubtree(node, STAFF), [node])
-  const direct = React.useMemo(() => countStaffDirect(node, STAFF), [node])
 
   const matchesSelf = !q || node.name.toLowerCase().includes(q)
 
@@ -159,14 +158,8 @@ function TreeNodeRow({
           )}
           onClick={() => onSelect(node.id)}
         >
-          {node.id !== ORG_ROOT.id ? (
-            <span className={sspVspTagClass} title="Направление деятельности">
-              {activityDirectionLabel(node.id)}
-            </span>
-          ) : null}
           <span className="min-w-0 flex-1 truncate font-medium">{node.name}</span>
           <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
-            {direct > 0 ? `${direct} / ` : ""}
             {subtree}
           </span>
         </button>
@@ -200,13 +193,9 @@ function staffForSelection(
   unit: OrgUnit,
   includeSubunits: boolean
 ): StaffMember[] {
-  const leaves = includeSubunits
-    ? collectLeafIds(unit)
-    : unit.children.length === 0
-      ? [unit.id]
-      : []
-  const leafSet = new Set(leaves)
-  return STAFF.filter((s) => leafSet.has(s.unitId))
+  const ids = includeSubunits ? collectUnitIds(unit) : [unit.id]
+  const idSet = new Set(ids)
+  return STAFF.filter((s) => idSet.has(s.unitId))
 }
 
 export function StaffOrgExplorer() {
@@ -214,6 +203,10 @@ export function StaffOrgExplorer() {
   const [includeSubunits, setIncludeSubunits] = React.useState(true)
   const [unitQuery, setUnitQuery] = React.useState("")
   const [staffQuery, setStaffQuery] = React.useState("")
+  const [staffPage, setStaffPage] = React.useState(1)
+  const [staffPageSize, setStaffPageSize] = React.useState<number>(
+    STAFF_TABLE_PAGE_SIZE_OPTIONS[0]
+  )
 
   const initialExpanded = React.useMemo(() => {
     const s = new Set<string>()
@@ -255,6 +248,22 @@ export function StaffOrgExplorer() {
     })
   }, [baseStaff, staffQuery])
 
+  const totalStaffItems = filteredStaff.length
+  const staffPages = Math.max(1, Math.ceil(totalStaffItems / staffPageSize))
+  const safeStaffPage = Math.min(staffPage, staffPages)
+  const pagedStaff = React.useMemo(() => {
+    const start = (safeStaffPage - 1) * staffPageSize
+    return filteredStaff.slice(start, start + staffPageSize)
+  }, [filteredStaff, safeStaffPage, staffPageSize])
+
+  React.useEffect(() => {
+    setStaffPage(1)
+  }, [selected.id, includeSubunits, staffQuery, staffPageSize])
+
+  React.useEffect(() => {
+    if (staffPage > staffPages) setStaffPage(staffPages)
+  }, [staffPage, staffPages])
+
   const breadcrumb = React.useMemo(
     () => getBreadcrumb(ORG_ROOT, selected.id),
     [selected.id]
@@ -269,33 +278,30 @@ export function StaffOrgExplorer() {
     })
   }
 
-  const subtreeTotal = countStaffInSubtree(selected, STAFF)
-  const directTotal = countStaffDirect(selected, STAFF)
-
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-4 py-4">
       <Tabs
         defaultValue="staff"
         className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
       >
-        <TabsList className="flex w-full overflow-hidden rounded-lg border border-border bg-muted p-[3px] divide-x divide-border">
+        <TabsList className="group-data-horizontal/tabs:h-8 flex h-8 w-full overflow-hidden rounded-lg border border-border bg-muted p-px divide-x divide-border">
           <TabsTrigger
             value="staff"
-            className="rounded-none rounded-l-md border-0 shadow-none data-active:rounded-md"
+            className="h-full rounded-none rounded-l-md border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
           >
             Подразделения и сотрудники
           </TabsTrigger>
           <TabsTrigger
             value="orgchart"
-            className="rounded-none rounded-r-md border-0 shadow-none data-active:rounded-md"
+            className="h-full rounded-none rounded-r-md border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
           >
-            Органограмма
+            Органиграмма
           </TabsTrigger>
         </TabsList>
         <TabsContent value="staff" className="mt-0 flex min-h-0 flex-1 flex-col">
           <div className="grid min-h-[min(70vh,720px)] min-w-0 flex-1 gap-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
             <aside className="flex min-h-0 flex-col rounded-lg border border-border bg-card">
-              <div className="border-b border-border px-3 py-2">
+              <div className="border-b border-border px-3 pt-2 pb-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Building2Icon className="size-3.5" />
                   Структура
@@ -373,20 +379,7 @@ export function StaffOrgExplorer() {
                       </Button>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground tabular-nums">
-                    <span className="flex items-center gap-1.5">
-                      <UsersIcon className="size-3.5" />
-                      {staffQuery.trim()
-                        ? `${filteredStaff.length} из ${baseStaff.length}`
-                        : `${filteredStaff.length}`}
-                    </span>
-                    <span className="text-muted-foreground/80">
-                      в поддереве: {subtreeTotal}
-                      {directTotal > 0 && (
-                        <span> · на узле: {directTotal}</span>
-                      )}
-                    </span>
-                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground tabular-nums" />
                 </div>
                 <Separator className="my-3" />
                 <div className="relative">
@@ -410,26 +403,24 @@ export function StaffOrgExplorer() {
                 )}
                 <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-sm">
                   <colgroup>
-                    <col className="w-5/12" />
-                    <col className="w-4/12" />
-                    <col className="w-1/12" />
+                    <col className="w-3/12" />
                     <col className="w-2/12" />
+                    <col className="w-7/12" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 border-b border-border bg-muted/80 backdrop-blur-sm">
                     <tr className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                       <th className="px-3 py-2 font-medium">ФИО</th>
                       <th className="px-3 py-2 font-medium">Должность</th>
-                      <th className="px-3 py-2 font-medium">Таб. №</th>
                       <th className="px-3 py-2 font-medium">Подразделение</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStaff.map((s) => {
+                    {pagedStaff.map((s) => {
                       const path = getBreadcrumb(ORG_ROOT, s.unitId)
                       const pathStr = path
                         .filter((u) => u.id !== ORG_ROOT.id)
                         .map((u) => u.name)
-                        .join(" → ")
+                        .join(" / ")
                       return (
                         <tr
                           key={s.id}
@@ -438,19 +429,24 @@ export function StaffOrgExplorer() {
                           <td className="min-w-0 px-3 py-2 align-middle">
                             <div className="flex min-w-0 items-center gap-3">
                               <StaffAvatar member={s} />
-                              <span className="min-w-0 truncate font-medium">
-                                {formatFio(s)}
-                              </span>
+                              <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <span className="min-w-0 truncate font-medium">
+                                  {formatFio(s)}
+                                </span>
+                                {s.isUnitHead ? (
+                                  <span
+                                    className="inline-flex shrink-0 items-center rounded-md border border-primary/45 bg-primary/12 px-1.5 py-px text-[11px] font-semibold leading-none text-primary"
+                                    title="Руководитель подразделения"
+                                  >
+                                    Руководитель
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           </td>
                           <td className="min-w-0 px-3 py-2 align-middle text-muted-foreground">
                             <span className="line-clamp-2 break-words">
                               {s.position}
-                            </span>
-                          </td>
-                          <td className="min-w-0 px-3 py-2 align-middle tabular-nums text-muted-foreground">
-                            <span className="block truncate">
-                              {s.personnelNumber}
                             </span>
                           </td>
                           <td className="min-w-0 px-3 py-2 align-middle text-muted-foreground">
@@ -468,6 +464,57 @@ export function StaffOrgExplorer() {
                     Нет сотрудников по заданным условиям.
                   </p>
                 )}
+                {filteredStaff.length > 0 ? (
+                  <div className="flex items-center justify-between border-t border-border px-3 py-2 text-sm">
+                    <div className="flex items-center gap-3 text-muted-foreground">
+                      <span>Всего: {totalStaffItems}</span>
+                      <label className="flex items-center gap-1.5">
+                        <span>Строк:</span>
+                        <select
+                          className="h-7 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                          value={staffPageSize}
+                          onChange={(e) => {
+                            const next = Number(e.target.value)
+                            setStaffPageSize(next)
+                          }}
+                        >
+                          {STAFF_TABLE_PAGE_SIZE_OPTIONS.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-sm"
+                        onClick={() => setStaffPage((p) => Math.max(1, p - 1))}
+                        disabled={safeStaffPage <= 1}
+                      >
+                        Назад
+                      </Button>
+                      <span className="tabular-nums text-muted-foreground">
+                        {safeStaffPage} / {staffPages}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-sm"
+                        onClick={() =>
+                          setStaffPage((p) => Math.min(staffPages, p + 1))
+                        }
+                        disabled={safeStaffPage >= staffPages}
+                      >
+                        Вперёд
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </section>
           </div>

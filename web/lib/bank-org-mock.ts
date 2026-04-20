@@ -535,18 +535,28 @@ function makeStaffForUnit(unitId: string, count: number): StaffMember[] {
   return out
 }
 
-/** Листовые подразделения, к которым «прикреплены» сотрудники в демо-данных */
+/** Подразделения всех уровней, к которым «прикреплены» сотрудники в демо-данных */
 const UNIT_COUNTS: Record<string, number> = {
+  "d-corp": 6,
+  "d-risk": 5,
+  "d-it": 8,
+  "d-ops": 5,
+  "m-corp-credit": 5,
   "o-corp-deals": 14,
   "o-corp-struct": 11,
   "m-corp-regional": 16,
+  "m-corp-treasury-sales": 6,
   "o-corp-deriv": 10,
+  "m-risk-credit": 6,
   "o-risk-underwriting": 18,
   "o-risk-portfolio": 9,
   "m-risk-market": 12,
+  "m-it-dev": 7,
   "o-it-payments": 17,
   "o-it-channels": 13,
   "m-it-infra": 15,
+  "m-it-security": 5,
+  "m-ops-payments": 6,
   "o-it-soc": 8,
   "o-ops-rko": 20,
   "o-ops-swift": 11,
@@ -587,12 +597,17 @@ export function collectLeafIds(node: OrgUnit): string[] {
   return node.children.flatMap(collectLeafIds)
 }
 
+/** Все узлы поддерева (включая текущий), когда сотрудники есть на любом уровне. */
+export function collectUnitIds(node: OrgUnit): string[] {
+  return [node.id, ...node.children.flatMap(collectUnitIds)]
+}
+
 export function countStaffInSubtree(
   node: OrgUnit,
   staff: StaffMember[]
 ): number {
-  const leaves = collectLeafIds(node)
-  const set = new Set(leaves)
+  const ids = collectUnitIds(node)
+  const set = new Set(ids)
   return staff.filter((s) => set.has(s.unitId)).length
 }
 
