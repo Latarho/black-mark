@@ -1,4 +1,4 @@
- "use client"
+"use client"
 
 import {
   Tabs,
@@ -7,6 +7,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useEffect, useMemo, useState } from "react"
+import { SearchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react"
+import { useMemo, useState } from "react"
 
 function formatFio(lastName: string, firstName: string, patronymic: string): string {
   return `${lastName} ${firstName} ${patronymic}`
@@ -371,9 +373,13 @@ function staffToneClass(staffId: string): string {
   return STAFF_TONE_CLASSES[Math.abs(hash) % STAFF_TONE_CLASSES.length]
 }
 
-function getUnitLabel(unitId: string, unitOptions: UnitOption[]): string {
-  if (unitId === "all") return "Все подразделения"
-  return unitOptions.find((unit) => unit.id === unitId)?.path || unitId
+function getSelectedUnitsLabel(selectedUnitIds: string[], unitOptions: UnitOption[]): string {
+  if (selectedUnitIds.length === 0) return "Все подразделения"
+  if (selectedUnitIds.length === 1) {
+    const [unitId] = selectedUnitIds
+    return unitOptions.find((unit) => unit.id === unitId)?.path || unitId
+  }
+  return `Выбрано подразделений: ${selectedUnitIds.length}`
 }
 
 function makeInitials(lastName: string, firstName: string, patronymic: string): string {
@@ -382,6 +388,163 @@ function makeInitials(lastName: string, firstName: string, patronymic: string): 
     .map((part) => part.charAt(0).toUpperCase())
     .join("")
     .slice(0, 2)
+}
+
+function parseTenureMonths(value?: string): number | null {
+  if (!value) return null
+  const yearsMatch = value.match(/(\d+)\s*(?:год|года|лет)/i)
+  const monthsMatch = value.match(/(\d+)\s*(?:месяц|месяца|месяцев)/i)
+  const years = yearsMatch ? Number(yearsMatch[1]) : 0
+  const months = monthsMatch ? Number(monthsMatch[1]) : 0
+  if (Number.isNaN(years) || Number.isNaN(months)) return null
+  return years * 12 + months
+}
+
+function parseTenureYears(value?: string): number | null {
+  if (!value) return null
+  const yearsMatch = value.match(/(\d+)\s*(?:год|года|лет)/i)
+  if (!yearsMatch) return null
+  const years = Number(yearsMatch[1])
+  return Number.isNaN(years) ? null : years
+}
+
+function parseNumberFilter(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const num = Number(trimmed)
+  return Number.isFinite(num) ? num : null
+}
+
+type SalaryMarketLevel =
+  | "below-median"
+  | "between-median-and-target"
+  | "above-market-max"
+  | "not-selected"
+
+type SurveyCategoryLevel = "top" | "middle" | "bottom"
+
+const SALARY_MARKET_LEVEL_OPTIONS: Array<{
+  value: SalaryMarketLevel
+  label: string
+}> = [
+  {
+    value: "below-median",
+    label: "Ниже медианы",
+  },
+  {
+    value: "between-median-and-target",
+    label: "Между медианой и целевым рынком",
+  },
+  {
+    value: "above-market-max",
+    label: "Выше максимума рынка",
+  },
+  {
+    value: "not-selected",
+    label: "Не выбрано",
+  },
+]
+
+const SALARY_MARKET_LEVEL_CLASSES: Record<SalaryMarketLevel, string> = {
+  "below-median":
+    "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200 hover:bg-red-200/80 dark:hover:bg-red-900/70",
+  "between-median-and-target":
+    "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 hover:bg-amber-200/80 dark:hover:bg-amber-900/70",
+  "above-market-max":
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200 hover:bg-emerald-200/80 dark:hover:bg-emerald-900/70",
+  "not-selected":
+    "bg-muted text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/80",
+}
+
+const SALARY_MARKET_LEVEL_LABELS: Record<SalaryMarketLevel, string> = {
+  "below-median": "Ниже медианы",
+  "between-median-and-target": "Между медианой и целевым рынком",
+  "above-market-max": "Выше максимума рынка",
+  "not-selected": "Не выбрано",
+}
+
+const SURVEY_CATEGORY_CLASSES: Record<SurveyCategoryLevel, string> = {
+  top: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200 hover:bg-emerald-200/80 dark:hover:bg-emerald-900/70",
+  middle: "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 hover:bg-amber-200/80 dark:hover:bg-amber-900/70",
+  bottom: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200 hover:bg-red-200/80 dark:hover:bg-red-900/70",
+}
+
+const ASSESSMENT_YEAR = new Date().getFullYear()
+const PREVIOUS_ASSESSMENT_YEAR = ASSESSMENT_YEAR - 1
+const ASSESSMENT_PROCEDURE_LABELS = [
+  "Оценочная процедура 1",
+  "Оценочная процедура 2",
+] as const
+
+function getAssessmentProcedureScore(
+  baseScore: number,
+  yearShift: 0 | 1,
+  procedureIndex: 0 | 1
+): number {
+  return (((baseScore - 1 + yearShift + procedureIndex) % 5) + 1)
+}
+
+function AssessmentTooltipContent({
+  baseScore,
+  title,
+}: {
+  baseScore: number
+  title: string
+}) {
+  const currentYearProcedure1 = getAssessmentProcedureScore(baseScore, 0, 0)
+  const currentYearProcedure2 = getAssessmentProcedureScore(baseScore, 0, 1)
+  const previousYearProcedure1 = getAssessmentProcedureScore(baseScore, 1, 0)
+  const previousYearProcedure2 = getAssessmentProcedureScore(baseScore, 1, 1)
+
+  return (
+    <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
+      <div className="flex flex-col gap-1.5">
+        <div className="font-semibold text-foreground">{title}</div>
+        <div className="flex flex-col gap-1 border-t border-border pt-1">
+          <div className="font-semibold text-foreground">
+            Оценки за текущий и предыдущий календарный год
+          </div>
+          <div className="mt-0.5 flex flex-col gap-1">
+            <div className="font-medium text-foreground">
+              {ASSESSMENT_YEAR}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[0]}</span>
+              <span className="font-semibold tabular-nums text-foreground">{currentYearProcedure1}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[1]}</span>
+              <span className="font-semibold tabular-nums text-foreground">{currentYearProcedure2}</span>
+            </div>
+          </div>
+          <div className="mt-0.5 flex flex-col gap-1">
+            <div className="font-medium text-foreground">
+              {PREVIOUS_ASSESSMENT_YEAR}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[0]}</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {previousYearProcedure1}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[1]}</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {previousYearProcedure2}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </TooltipContent>
+  )
+}
+
+function formatMinutesToHourMinute(totalMinutes?: number): string {
+  if (!totalMinutes || totalMinutes < 0 || !Number.isFinite(totalMinutes)) return "00:00"
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
 }
 
 function makeNineBoxBuckets(staff: StaffMember[]): StaffMember[][] {
@@ -410,43 +573,185 @@ function MiniAvatar({ member }: { member: StaffMember }) {
 }
 
 export default function AssessmentPage() {
-  const [selectedUnitId, setSelectedUnitId] = useState<string>("all")
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([])
+  const [staffSearchQuery, setStaffSearchQuery] = useState("")
+  const [fioFilterQuery, setFioFilterQuery] = useState("")
+  const [selectedPositionIds, setSelectedPositionIds] = useState<string[]>([])
+  const [positionSearchQuery, setPositionSearchQuery] = useState("")
+  const [unitSearchQuery, setUnitSearchQuery] = useState("")
+  const [bankTenureFrom, setBankTenureFrom] = useState("")
+  const [bankTenureTo, setBankTenureTo] = useState("")
+  const [blockTenureFrom, setBlockTenureFrom] = useState("")
+  const [blockTenureTo, setBlockTenureTo] = useState("")
+  const [ageFrom, setAgeFrom] = useState("")
+  const [ageTo, setAgeTo] = useState("")
+  const [vacationDaysFrom, setVacationDaysFrom] = useState("")
+  const [vacationDaysTo, setVacationDaysTo] = useState("")
   const unitOptions = useMemo(() => collectUnitOptions(ORG_ROOT), [])
   const [staffPage, setStaffPage] = useState(1)
   const [staffPageSize, setStaffPageSize] = useState<number>(
     STAFF_TABLE_PAGE_SIZE_OPTIONS[0]
   )
   const [isNineBoxOpen, setIsNineBoxOpen] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [nineBoxCellDetail, setNineBoxCellDetail] = useState<NineBoxCellDetail | null>(
     null
   )
+  const [salaryMarketLevelOverrides, setSalaryMarketLevelOverrides] = useState<
+    Record<string, SalaryMarketLevel>
+  >({})
 
   const staffInUnit = useMemo(() => {
-    if (selectedUnitId === "all") return STAFF
-    return STAFF.filter((member) => member.unitId === selectedUnitId)
-  }, [selectedUnitId])
+    if (selectedUnitIds.length === 0) return STAFF
+    const selected = new Set(selectedUnitIds)
+    return STAFF.filter((member) => selected.has(member.unitId))
+  }, [selectedUnitIds])
 
-  const totalStaffItems = staffInUnit.length
+  const filteredStaff = useMemo(() => {
+    const globalQuery = staffSearchQuery.trim().toLowerCase()
+    const fioQuery = fioFilterQuery.trim().toLowerCase()
+    const selectedPositions = new Set(selectedPositionIds)
+    const parsedBankTenureFrom = parseNumberFilter(bankTenureFrom)
+    const parsedBankTenureTo = parseNumberFilter(bankTenureTo)
+    const parsedBlockTenureFrom = parseNumberFilter(blockTenureFrom)
+    const parsedBlockTenureTo = parseNumberFilter(blockTenureTo)
+    const parsedAgeFrom = parseNumberFilter(ageFrom)
+    const parsedAgeTo = parseNumberFilter(ageTo)
+    const parsedVacationFrom = parseNumberFilter(vacationDaysFrom)
+                          const parsedVacationTo = parseNumberFilter(vacationDaysTo)
+    const isInRange = (value: number | null, min: number | null, max: number | null) => {
+      if (min === null && max === null) return true
+      if (value === null) return false
+      if (min !== null && value < min) return false
+      if (max !== null && value > max) return false
+      return true
+    }
+
+    return staffInUnit.filter((member) => {
+      const unitPath = getBreadcrumb(ORG_ROOT, member.unitId)
+        .filter((unit) => unit.id !== ORG_ROOT.id)
+        .map((unit) => unit.name)
+        .join(" / ")
+      const fio = formatFio(member.lastName, member.firstName, member.patronymic)
+      const searchText = [
+        fio,
+        member.position,
+        unitPath,
+      ]
+        .join(" ")
+        .toLowerCase()
+
+      return (
+        (!globalQuery || searchText.includes(globalQuery)) &&
+        (!fioQuery || fio.toLowerCase().includes(fioQuery)) &&
+        (selectedPositionIds.length === 0 || selectedPositions.has(member.position)) &&
+        isInRange(parseTenureMonths(member.bankTenure), parsedBankTenureFrom, parsedBankTenureTo) &&
+        isInRange(
+          parseTenureMonths(member.blockTenure),
+          parsedBlockTenureFrom,
+          parsedBlockTenureTo
+        ) &&
+        isInRange(member.age ?? null, parsedAgeFrom, parsedAgeTo) &&
+        isInRange(member.unusedVacationDays ?? null, parsedVacationFrom, parsedVacationTo)
+      )
+    })
+  }, [
+    fioFilterQuery,
+    selectedPositionIds,
+    staffInUnit,
+    staffSearchQuery,
+    bankTenureFrom,
+    bankTenureTo,
+    blockTenureFrom,
+    blockTenureTo,
+    ageFrom,
+    ageTo,
+    vacationDaysFrom,
+    vacationDaysTo,
+  ])
+
+  const totalStaffItems = filteredStaff.length
   const staffPages = Math.max(1, Math.ceil(totalStaffItems / staffPageSize))
   const safeStaffPage = Math.min(staffPage, staffPages)
   const pagedStaff = useMemo(() => {
     const start = (safeStaffPage - 1) * staffPageSize
-    return staffInUnit.slice(start, start + staffPageSize)
-  }, [safeStaffPage, staffInUnit, staffPageSize])
-  const currentUnitLabel = getUnitLabel(selectedUnitId, unitOptions)
-  const nineBoxBuckets = useMemo(() => makeNineBoxBuckets(staffInUnit), [staffInUnit])
+    return filteredStaff.slice(start, start + staffPageSize)
+  }, [filteredStaff, safeStaffPage, staffPageSize])
+  const currentUnitLabel = getSelectedUnitsLabel(selectedUnitIds, unitOptions)
+  const activeFiltersCount =
+    selectedUnitIds.length +
+    (fioFilterQuery.trim() ? 1 : 0) +
+    selectedPositionIds.length +
+    (bankTenureFrom.trim() ? 1 : 0) +
+    (bankTenureTo.trim() ? 1 : 0) +
+    (blockTenureFrom.trim() ? 1 : 0) +
+    (blockTenureTo.trim() ? 1 : 0) +
+    (ageFrom.trim() ? 1 : 0) +
+    (ageTo.trim() ? 1 : 0) +
+    (vacationDaysFrom.trim() ? 1 : 0) +
+    (vacationDaysTo.trim() ? 1 : 0)
+  const hasBankTenureInterval =
+    Boolean(bankTenureFrom.trim()) || Boolean(bankTenureTo.trim())
+  const bankTenureIntervalLabel = `${bankTenureFrom.trim() || "0"} - ${bankTenureTo.trim() || "40"}`
+  const uniquePositionOptions = useMemo(() => {
+    const values = new Set(STAFF.map((member) => member.position))
+    return [...values].sort((a, b) => a.localeCompare(b))
+  }, [])
+  const filteredPositionOptions = useMemo(() => {
+    const query = positionSearchQuery.trim().toLowerCase()
+    if (!query) return uniquePositionOptions
+    return uniquePositionOptions.filter((position) => position.toLowerCase().includes(query))
+  }, [positionSearchQuery, uniquePositionOptions])
+  const selectedUnitTags = useMemo(() => {
+    const unitPathById = new Map(unitOptions.map((unit) => [unit.id, unit.path]))
+    return selectedUnitIds.map((unitId) => ({
+      id: unitId,
+      label: unitPathById.get(unitId) || unitId,
+    }))
+  }, [selectedUnitIds, unitOptions])
+  const filteredUnitOptions = useMemo(() => {
+    const query = unitSearchQuery.trim().toLowerCase()
+    if (!query) return unitOptions
+    return unitOptions.filter((unit) => unit.path.toLowerCase().includes(query))
+  }, [unitOptions, unitSearchQuery])
+  const nineBoxBuckets = useMemo(() => makeNineBoxBuckets(filteredStaff), [filteredStaff])
 
-  useEffect(() => {
-    if (staffPage > staffPages) setStaffPage(staffPages)
-  }, [staffPage, staffPages])
-
-  useEffect(() => {
+  const toggleSelectedUnit = (unitId: string) => {
+    setSelectedUnitIds((prev) =>
+      prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]
+    )
+    setStaffPage(1)
     setNineBoxCellDetail(null)
-  }, [selectedUnitId])
+  }
 
-  useEffect(() => {
-    if (!isNineBoxOpen) setNineBoxCellDetail(null)
-  }, [isNineBoxOpen])
+  const toggleSelectedPosition = (position: string) => {
+    setSelectedPositionIds((prev) =>
+      prev.includes(position) ? prev.filter((item) => item !== position) : [...prev, position]
+    )
+    setStaffPage(1)
+    setNineBoxCellDetail(null)
+  }
+
+  const resetSelectedUnits = () => {
+    setSelectedUnitIds([])
+    setStaffPage(1)
+    setNineBoxCellDetail(null)
+  }
+
+  const resetColumnFilters = () => {
+    setFioFilterQuery("")
+    setSelectedPositionIds([])
+    setPositionSearchQuery("")
+    setBankTenureFrom("")
+    setBankTenureTo("")
+    setBlockTenureFrom("")
+    setBlockTenureTo("")
+    setAgeFrom("")
+    setAgeTo("")
+    setVacationDaysFrom("")
+    setVacationDaysTo("")
+    resetSelectedUnits()
+  }
 
   const nineBoxRoleDetail = nineBoxCellDetail
     ? getNineBoxRoleProfile(nineBoxCellDetail.roleLabel)
@@ -476,46 +781,487 @@ export default function AssessmentPage() {
         <TabsContent value="team" className="mt-0 flex min-h-0 flex-1 flex-col">
           <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-card">
             <div className="border-b border-border px-3 py-3">
-              <label className="inline-flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">Подразделение</span>
-                <select
-                  value={selectedUnitId}
-                  onChange={(event) => {
-                    setSelectedUnitId(event.target.value)
-                    setStaffPage(1)
-                  }}
-                  className="h-8 min-w-[300px] rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="all">Все подразделения</option>
-                  {unitOptions.map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.path}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                <div className="relative min-w-0 flex-1">
+                  <SearchIcon
+                    data-icon="inline-start"
+                    className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    value={staffSearchQuery}
+                    onChange={(event) => {
+                      setStaffSearchQuery(event.target.value)
+                      setStaffPage(1)
+                    }}
+                    placeholder="Поиск по ФИО, подразделению или должности"
+                    className="h-10 pr-9 pl-9"
+                  />
+                  {staffSearchQuery ? (
+                    <button
+                      type="button"
+                      className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center justify-center rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Очистить поиск"
+                      onClick={() => {
+                        setStaffSearchQuery("")
+                        setStaffPage(1)
+                      }}
+                    >
+                      <XIcon className="size-4" />
+                    </button>
+                  ) : null}
+                </div>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-8"
+                  className="h-10"
+                  onClick={() => setIsFiltersOpen(true)}
+                >
+                  <SlidersHorizontalIcon data-icon="inline-start" />
+                  Фильтры
+                  {activeFiltersCount > 0 ? ` (${activeFiltersCount})` : null}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-10"
                   onClick={() => setIsNineBoxOpen(true)}
                 >
                   Открыть 9-box
                 </Button>
-              </label>
+              </div>
             </div>
+            {activeFiltersCount > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+                <span className="text-sm font-medium text-muted-foreground">Выбрано:</span>
+                {fioFilterQuery.trim() ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">ФИО: {fioFilterQuery.trim()}</span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по ФИО"
+                      onClick={() => {
+                        setFioFilterQuery("")
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {selectedPositionIds.length > 0 ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      Должность: {selectedPositionIds.join(", ")}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по должности"
+                      onClick={() => {
+                        setSelectedPositionIds([])
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {hasBankTenureInterval ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      Стаж в Банке: {bankTenureIntervalLabel} лет
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по стажу в банке"
+                      onClick={() => {
+                        setBankTenureFrom("")
+                        setBankTenureTo("")
+                        setStaffPage(1)
+                        setNineBoxCellDetail(null)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {selectedUnitTags.map((unit) => (
+                  <span
+                    key={unit.id}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground"
+                  >
+                    <span className="truncate">Подразделение: {unit.label}</span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label={`Убрать подразделение ${unit.label}`}
+                      onClick={() => toggleSelectedUnit(unit.id)}
+                    >
+                      x
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <Dialog open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+              <DialogContent className="max-h-[90vh] w-[96vw] max-w-6xl gap-0 overflow-hidden p-0">
+                <DialogHeader className="border-b border-border px-6 py-4">
+                  <DialogTitle>Фильтры</DialogTitle>
+                  <DialogDescription>
+                    Настройте фильтрацию по всем столбцам таблицы.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex min-h-0 flex-col gap-4 px-6 py-4">
+                <div className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">ФИО</span>
+                      <Input
+                        value={fioFilterQuery}
+                        onChange={(event) => {
+                          setFioFilterQuery(event.target.value)
+                          setStaffPage(1)
+                        }}
+                        placeholder="Например: Иванов"
+                        className="h-10"
+                      />
+                    </label>
+                  <div className="my-1 border-t border-border" />
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <label className="flex min-w-0 flex-col gap-1.5">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-medium text-muted-foreground">Должность</p>
+                          <p className="truncate text-muted-foreground">
+                            Текущий фильтр:{" "}
+                            {selectedPositionIds.length === 0 ? "Все должности" : selectedPositionIds.join(", ")}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedPositionIds([])
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                        >
+                          Сбросить все
+                        </Button>
+                      </div>
+                      <Input
+                        value={positionSearchQuery}
+                        onChange={(event) => setPositionSearchQuery(event.target.value)}
+                        placeholder="Поиск должности"
+                        className="mt-2 h-10"
+                      />
+                      <div className="mt-2 max-h-[11rem] min-h-0 overflow-auto rounded-md border border-border p-2">
+                        <label className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted">
+                          <input
+                            type="checkbox"
+                            checked={selectedPositionIds.length === 0}
+                            onChange={() => {
+                              setSelectedPositionIds([])
+                              setStaffPage(1)
+                              setNineBoxCellDetail(null)
+                            }}
+                            className="mt-0.5"
+                          />
+                          <span className="min-w-0 leading-snug">Все должности</span>
+                        </label>
+                        <div className="my-1 border-t border-border" />
+                        {filteredPositionOptions.map((position) => (
+                          <label
+                            key={position}
+                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedPositionIds.includes(position)}
+                              onChange={() => toggleSelectedPosition(position)}
+                              className="mt-0.5"
+                            />
+                            <span className="min-w-0 leading-snug">{position}</span>
+                          </label>
+                        ))}
+                        {filteredPositionOptions.length === 0 ? (
+                          <p className="px-2 py-3 text-sm leading-snug text-muted-foreground">
+                            Должности не найдены.
+                          </p>
+                        ) : null}
+                      </div>
+                    </label>
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-medium text-muted-foreground">Подразделение</p>
+                          <p className="truncate text-muted-foreground">
+                            Текущий фильтр: {currentUnitLabel}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={resetColumnFilters}
+                        >
+                          Сбросить все
+                        </Button>
+                      </div>
+                      <Input
+                        value={unitSearchQuery}
+                        onChange={(event) => setUnitSearchQuery(event.target.value)}
+                        placeholder="Поиск подразделения"
+                        className="mt-2 h-10"
+                      />
+                      <div className="mt-2 max-h-[11rem] min-h-0 overflow-auto rounded-md border border-border p-2">
+                        <label className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted">
+                          <input
+                            type="checkbox"
+                            checked={selectedUnitIds.length === 0}
+                            onChange={resetSelectedUnits}
+                            className="mt-0.5"
+                          />
+                          <span>Все подразделения</span>
+                        </label>
+                        <div className="my-1 border-t border-border" />
+                        {filteredUnitOptions.map((unit) => (
+                          <label
+                            key={unit.id}
+                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedUnitIds.includes(unit.id)}
+                              onChange={() => toggleSelectedUnit(unit.id)}
+                              className="mt-0.5"
+                            />
+                            <span className="min-w-0 leading-snug">{unit.path}</span>
+                          </label>
+                        ))}
+                        {filteredUnitOptions.length === 0 ? (
+                          <p className="px-2 py-3 text-sm text-muted-foreground">
+                            Подразделения не найдены.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="my-1 border-t border-border" />
+                  <div className="grid gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-muted-foreground">Стаж в Банке (лет)</span>
+                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>От: {bankTenureFrom || "0"} лет</span>
+                        <span>До: {bankTenureTo || "40"} лет</span>
+                      </div>
+                      <div className="relative mt-3 h-8">
+                        <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded bg-muted" />
+                        <div
+                          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded bg-primary"
+                          style={{
+                            left: `${((Number(bankTenureFrom || "0") / 40) * 100).toFixed(2)}%`,
+                            width: `${((Number(bankTenureTo || "40") - Number(bankTenureFrom || "0")) / 40) * 100}%`,
+                          }}
+                        />
+                        <input
+                          type="range"
+                          min={0}
+                          max={40}
+                          value={bankTenureFrom || "0"}
+                          onChange={(event) => {
+                            const nextFrom = Number(event.target.value)
+                            setBankTenureFrom(String(nextFrom))
+                            if (bankTenureTo && nextFrom > Number(bankTenureTo)) {
+                              setBankTenureTo(String(nextFrom))
+                            }
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          className="absolute inset-0 z-20 h-2 w-full cursor-pointer appearance-none bg-transparent"
+                        />
+                        <input
+                          type="range"
+                          min={0}
+                          max={40}
+                          value={bankTenureTo || "40"}
+                          onChange={(event) => {
+                            const nextTo = Number(event.target.value)
+                            setBankTenureTo(String(nextTo))
+                            if (bankTenureFrom && nextTo < Number(bankTenureFrom)) {
+                              setBankTenureFrom(String(nextTo))
+                            }
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          className="absolute inset-0 z-10 h-2 w-full cursor-pointer appearance-none bg-transparent"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-0.5">
+                      <div className="col-span-1 sm:col-span-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Стаж в Блоке, ССП (лет)
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={blockTenureFrom}
+                          onChange={(event) => {
+                            setBlockTenureFrom(event.target.value)
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          placeholder="От"
+                          className="h-10 w-1/2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={blockTenureTo}
+                          onChange={(event) => {
+                            setBlockTenureTo(event.target.value)
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          placeholder="До"
+                          className="h-10 w-1/2"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-0.5">
+                      <div className="col-span-1 sm:col-span-2">
+                        <span className="text-sm font-medium text-muted-foreground">Возраст</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={ageFrom}
+                          onChange={(event) => {
+                            setAgeFrom(event.target.value)
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          placeholder="От"
+                          className="h-10 w-1/2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={ageTo}
+                          onChange={(event) => {
+                            setAgeTo(event.target.value)
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          placeholder="До"
+                          className="h-10 w-1/2"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-0.5">
+                      <div className="col-span-1 sm:col-span-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Дней неиспользованного отпуска
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={vacationDaysFrom}
+                          onChange={(event) => {
+                            setVacationDaysFrom(event.target.value)
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          placeholder="От"
+                          className="h-10 w-1/2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={vacationDaysTo}
+                          onChange={(event) => {
+                            setVacationDaysTo(event.target.value)
+                            setStaffPage(1)
+                            setNineBoxCellDetail(null)
+                          }}
+                          placeholder="До"
+                          className="h-10 w-1/2"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </div>
+                <div className="flex justify-end border-t border-border px-6 py-4">
+                  <Button type="button" onClick={() => setIsFiltersOpen(false)}>
+                    Применить
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full min-w-[680px] table-fixed border-collapse text-left text-sm">
                 <colgroup>
-                  <col className="w-4/12" />
-                  <col className="w-3/12" />
-                  <col className="w-5/12" />
+                    <col className="w-[25%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[5%]" />
+                  <col className="w-[5%]" />
+                  <col className="w-[5%]" />
+                  <col className="w-[5%]" />
+                  <col className="w-[5%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[5%]" />
                 </colgroup>
                 <thead className="sticky top-0 z-10 border-b border-border bg-muted/80 backdrop-blur-sm">
                   <tr className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">ФИО</th>
-                    <th className="px-3 py-2 font-medium">Должность</th>
-                    <th className="px-3 py-2 font-medium">Подразделение</th>
+                    <th className="px-2 py-2 font-medium">ФИО</th>
+                    <th className="px-2 py-2 font-medium">Подразделение</th>
+                    <th className="px-2 py-2 font-medium">Стаж в Банке</th>
+                    <th className="px-2 py-2 font-medium">Стаж в Блоке, ССП</th>
+                    <th className="px-2 py-2 font-medium">Возраст</th>
+                    <th className="px-2 py-2 font-medium">дни неисп. отпуска</th>
+                    <th className="px-2 py-2 font-medium">Переработки</th>
+                    <th className="px-2 py-2 font-medium">Уровень З/П относительно рынка</th>
+                    <th className="px-2 py-2 font-medium">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>Опрос - результат</span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
+                          Опрос - категория по вкладу в результат
+                        </TooltipContent>
+                      </Tooltip>
+                    </th>
+                    <th className="px-2 py-2 font-medium">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span>Опрос - команда</span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
+                            Опрос - категория по команде
+                        </TooltipContent>
+                      </Tooltip>
+                    </th>
+                    <th className="w-[5%] px-2 py-2 font-medium">оценка РИТМ</th>
+                    <th className="w-[5%] px-2 py-2 font-medium">внешняя оценка</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -524,23 +1270,198 @@ export default function AssessmentPage() {
                       .filter((u) => u.id !== ORG_ROOT.id)
                       .map((u) => u.name)
                       .join(" / ")
+                    const currentSalaryMarketLevel =
+                      salaryMarketLevelOverrides[s.id] ??
+                      s.salaryMarketLevel ??
+                      "not-selected"
+                    const currentSurveyResultCategory = s.surveyResultCategory ?? "middle"
+                    const currentSurveyInteractionCategory = s.surveyInteractionCategory ?? "middle"
                     return (
                       <tr key={s.id} className="border-b border-border/80 hover:bg-muted/40">
-                        <td className="min-w-0 px-3 py-2 align-middle">
+                        <td className="min-w-0 px-2 py-2 align-middle">
                           <div className="flex min-w-0 items-center gap-2">
-                            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary ring-1 ring-primary/25">
+                                <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary ring-1 ring-primary/25">
                               {makeInitials(s.lastName, s.firstName, s.patronymic)}
                             </span>
-                            <span className="truncate font-medium">
-                              {formatFio(s.lastName, s.firstName, s.patronymic)}
-                            </span>
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium">
+                                    {formatFio(s.lastName, s.firstName, s.patronymic)}
+                                  </p>
+                                  <p className="mt-0.5 line-clamp-2 break-words leading-snug text-muted-foreground">
+                                    {s.position}
+                                  </p>
+                                </div>
                           </div>
                         </td>
                         <td className="min-w-0 px-3 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words">{s.position}</span>
-                        </td>
-                        <td className="min-w-0 px-3 py-2 align-middle text-muted-foreground">
                           <span className="line-clamp-2 break-words leading-snug">{unitPath}</span>
+                        </td>
+                        <td className="min-w-0 w-[5%] px-2 py-2 align-middle text-muted-foreground">
+                          <span className="line-clamp-2 break-words leading-snug">
+                            {parseTenureYears(s.bankTenure) ?? "—"}
+                          </span>
+                        </td>
+                        <td className="min-w-0 w-[5%] px-2 py-2 align-middle text-muted-foreground">
+                          <span className="line-clamp-2 break-words leading-snug">
+                            {parseTenureYears(s.blockTenure) ?? "—"}
+                          </span>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                          <span className="line-clamp-2 break-words leading-snug">
+                            {s.age ?? "—"}
+                          </span>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                          <span className="line-clamp-2 break-words leading-snug">
+                            {s.unusedVacationDays ?? "—"}
+                          </span>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="line-clamp-2 break-words leading-snug">
+                                {((s.overtimeHoursLastMonth ?? 0) > 0 && typeof s.overtimeHoursLastMonth === "number") ? (
+                                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                    ДА
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                    НЕТ
+                                  </span>
+                                )}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
+                              <div className="flex flex-col gap-1.5">
+                                <div className="font-semibold text-foreground">
+                                  СУРВ информация за 3 последних календарных месяца (среднее за рабочий день):
+                                </div>
+                                <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                                  <span>Чистое время в офисе</span>
+                                  <span className="font-semibold tabular-nums text-foreground">
+                                    {formatMinutesToHourMinute(s.overtimeOfficeMinutesLast3Months)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                                  <span>Общее время работы за компьютером</span>
+                                  <span className="font-semibold tabular-nums text-foreground">
+                                    {formatMinutesToHourMinute(s.overtimeComputerMinutesLast3Months)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                                  <span>Работа за ПК + звонки</span>
+                                  <span className="font-semibold tabular-nums text-foreground">
+                                    {formatMinutesToHourMinute(s.overtimeComputerAndCallsMinutesLast3Months)}
+                                  </span>
+                                </div>
+                                <div className="mt-0.5 flex items-center justify-between gap-2 border-t border-border pt-1">
+                                  <span className="text-muted-foreground">Режим работы:</span>
+                                  <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                                    {s.workMode || "гибкий режим"}
+                                  </span>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle">
+                          <label
+                            className="sr-only"
+                            htmlFor={`salary-market-level-${s.id}`}
+                          >
+                            Уровень з/п относительно рынка для сотрудника{" "}
+                            {formatFio(s.lastName, s.firstName, s.patronymic)}
+                          </label>
+                          <div className="relative">
+                            <select
+                              id={`salary-market-level-${s.id}`}
+                              value={currentSalaryMarketLevel}
+                              onChange={(event) => {
+                                setSalaryMarketLevelOverrides((prev) => ({
+                                  ...prev,
+                                  [s.id]: event.target.value as SalaryMarketLevel,
+                                }))
+                                setNineBoxCellDetail(null)
+                              }}
+                              className={`h-7 min-w-0 w-full rounded-full border border-input px-2 py-1 text-xs font-semibold ${SALARY_MARKET_LEVEL_CLASSES[currentSalaryMarketLevel]}`}
+                            >
+                              {SALARY_MARKET_LEVEL_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {SALARY_MARKET_LEVEL_LABELS[option.value]}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${SURVEY_CATEGORY_CLASSES[currentSurveyResultCategory]}`}
+                          >
+                            {currentSurveyResultCategory}
+                          </span>
+                          <span className="sr-only">
+                            Опрос - категория по вкладу в результат для сотрудника{" "}
+                            {formatFio(s.lastName, s.firstName, s.patronymic)}:{" "}
+                            {currentSurveyResultCategory}
+                          </span>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${SURVEY_CATEGORY_CLASSES[currentSurveyInteractionCategory]}`}
+                          >
+                            {currentSurveyInteractionCategory}
+                          </span>
+                          <span className="sr-only">
+                            Опрос - категория по команде для сотрудника{" "}
+                            {formatFio(s.lastName, s.firstName, s.patronymic)}:{" "}
+                            {currentSurveyInteractionCategory}
+                          </span>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                          <span className="line-clamp-2 break-words leading-snug">
+                            {s.rhythmAssessmentResult === undefined
+                              ? "—"
+                              : s.rhythmAssessmentResult >= 4 ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                      ДА
+                                    </span>
+                                  </TooltipTrigger>
+                                  <AssessmentTooltipContent
+                                    baseScore={s.rhythmAssessmentResult}
+                                    title="Оценка РИТМ"
+                                  />
+                                </Tooltip>
+                              ) : (
+                                <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                  НЕТ
+                                </span>
+                              )}
+                          </span>
+                        </td>
+                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                          <span className="line-clamp-2 break-words leading-snug">
+                            {s.externalAssessmentResult === undefined ? (
+                              "—"
+                            ) : s.externalAssessmentResult >= 4 ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                    ДА
+                                  </span>
+                                </TooltipTrigger>
+                                <AssessmentTooltipContent
+                                  baseScore={s.externalAssessmentResult}
+                                  title="Внешняя оценка"
+                                />
+                              </Tooltip>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                НЕТ
+                              </span>
+                            )}
+                          </span>
                         </td>
                       </tr>
                     )
@@ -597,7 +1518,13 @@ export default function AssessmentPage() {
                 </div>
               ) : null}
             </div>
-            <Sheet open={isNineBoxOpen} onOpenChange={setIsNineBoxOpen}>
+            <Sheet
+              open={isNineBoxOpen}
+              onOpenChange={(open) => {
+                setIsNineBoxOpen(open)
+                if (!open) setNineBoxCellDetail(null)
+              }}
+            >
               <SheetContent
                 side="bottom"
                 showCloseButton={true}

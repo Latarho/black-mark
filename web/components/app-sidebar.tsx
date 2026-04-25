@@ -35,11 +35,11 @@ export function AppSidebar() {
           <span className="truncate">Чёрная метка</span>
         </span>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="space-y-6">
         <SidebarGroup>
           <SidebarGroupLabel>Оценка</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-2">
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
@@ -70,7 +70,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Администрирование</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-2">
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild

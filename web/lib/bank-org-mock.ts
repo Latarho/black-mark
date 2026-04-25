@@ -79,6 +79,32 @@ export interface StaffMember {
   timezone?: string
   /** Человекочитаемо, напр. «10 лет 2 месяца» */
   bankTenure?: string
+  /** Человекочитаемо, напр. «3 года 7 месяцев» */
+  blockTenure?: string
+  /** Возраст сотрудника */
+  age?: number
+  /** Количество дней неиспользованного отпуска */
+  unusedVacationDays?: number
+  /** Переработки за последний календарный месяц в часах */
+  overtimeHoursLastMonth?: number
+  /** Чистое время в офисе за 3 последних календарных месяца (в минутах) */
+  overtimeOfficeMinutesLast3Months?: number
+  /** Общее время работы за компьютером за 3 последних календарных месяца (в минутах) */
+  overtimeComputerMinutesLast3Months?: number
+  /** Работа за ПК + звонки за 3 последних календарных месяца (в минутах) */
+  overtimeComputerAndCallsMinutesLast3Months?: number
+  /** Режим работы */
+  workMode?: string
+  /** Уровень З/П относительно рынка */
+  salaryMarketLevel?: "below-median" | "between-median-and-target" | "above-market-max"
+  /** Результат опроса по вкладу в результат */
+  surveyResultCategory?: "top" | "middle" | "bottom"
+  /** Результат опроса по командному взаимодействию */
+  surveyInteractionCategory?: "top" | "middle" | "bottom"
+  /** Результаты оценки РИТМ */
+  rhythmAssessmentResult?: number
+  /** Внешняя оценка */
+  externalAssessmentResult?: number
   /** Человекочитаемо, напр. «9 октября» */
   birthday?: string
   contacts?: {
@@ -128,20 +154,71 @@ function demoProfileForStaff(
   base: number
 ): Pick<
   StaffMember,
-  "login" | "timezone" | "bankTenure" | "birthday" | "contacts"
+  | "login"
+  | "timezone"
+  | "bankTenure"
+  | "blockTenure"
+  | "age"
+  | "overtimeHoursLastMonth"
+  | "overtimeOfficeMinutesLast3Months"
+  | "overtimeComputerMinutesLast3Months"
+  | "overtimeComputerAndCallsMinutesLast3Months"
+  | "workMode"
+  | "unusedVacationDays"
+  | "salaryMarketLevel"
+  | "surveyResultCategory"
+  | "surveyInteractionCategory"
+  | "rhythmAssessmentResult"
+  | "externalAssessmentResult"
+  | "birthday"
+  | "contacts"
 > {
   const h = base + i * 13
   const day = 1 + (h % 28)
   const monthIx = h % 12
   const years = 2 + (h % 28)
   const months = h % 12
+  const blockYears = 1 + (h % 11)
+  const blockMonths = (h * 2) % 12
+  const age = 22 + (h % 37)
+  const unusedVacationDays = 5 + (h % 45)
+  const overtimeHoursLastMonth = h % 30
+  const overtimeOfficeMinutesLast3Months = 120 + (h % 540)
+  const overtimeComputerMinutesLast3Months = overtimeOfficeMinutesLast3Months + 45 + (h % 120)
+  const overtimeComputerAndCallsMinutesLast3Months =
+    overtimeComputerMinutesLast3Months + 30 + (h % 180)
+  const workMode = ["гибкий режим", "офисный режим", "гибридный режим"][h % 3]
+  const salaryMarketLevel: StaffMember["salaryMarketLevel"] = [
+    "below-median",
+    "between-median-and-target",
+    "above-market-max",
+  ][h % 3]
+  const surveyResultCategory: StaffMember["surveyResultCategory"] = ["top", "middle", "bottom"][h % 3]
+  const surveyInteractionCategory: StaffMember["surveyInteractionCategory"] = ["bottom", "middle", "top"][h % 3]
+  const rhythmAssessmentResult = 1 + (h % 5)
+  const externalAssessmentResult = 1 + ((h + 2) % 5)
   const emailLocal = `user${(h % 90000) + 10000}`
   const tenureParts = [`${years} ${pluralRuYears(years)}`]
   if (months > 0) tenureParts.push(`${months} ${pluralRuMonths(months)}`)
+  const blockTenureParts = [`${blockYears} ${pluralRuYears(blockYears)}`]
+  if (blockMonths > 0) blockTenureParts.push(`${blockMonths} ${pluralRuMonths(blockMonths)}`)
   return {
     login: `gpbu\\${emailLocal}`,
     timezone: "МСК +0",
     bankTenure: tenureParts.join(" "),
+    blockTenure: blockTenureParts.join(" "),
+    age,
+    unusedVacationDays,
+    overtimeHoursLastMonth,
+    overtimeOfficeMinutesLast3Months,
+    overtimeComputerMinutesLast3Months,
+    overtimeComputerAndCallsMinutesLast3Months,
+    workMode,
+    salaryMarketLevel,
+    surveyResultCategory,
+    surveyInteractionCategory,
+    rhythmAssessmentResult,
+    externalAssessmentResult,
     birthday: `${day} ${MONTHS_GEN[monthIx]}`,
     contacts: {
       workEmail: `${emailLocal}@corp.bank`,
