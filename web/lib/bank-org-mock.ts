@@ -125,6 +125,10 @@ export interface StaffMember {
   managerResignationProbability?: "low" | "medium" | "high" | "not-evaluated"
   /** Человекочитаемо, напр. «9 октября» */
   birthday?: string
+  /** URL фото для аватара (статичный путь в /public) */
+  avatarUrl?: string
+  /** Календарный год кадрового цикла для отображаемого результата оценки (например 2025 или 2026) */
+  assessmentCycleYear?: number
   contacts?: {
     workEmail: string
     cityPhone: string
@@ -708,6 +712,7 @@ const STAFF_DEMO_POMYTKIN: StaffMember = {
   position: "Аналитик SOC",
   personnelNumber: "91337",
   ...demoProfileForStaff("o-it-soc", 42, hashString("staff-demo-pomytkin-so")),
+  avatarUrl: "/avatars/pomytkin-sergey.png",
 }
 
 export const STAFF: StaffMember[] = [

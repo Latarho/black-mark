@@ -10,13 +10,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-
-function sectionTitle(pathname: string) {
-  if (pathname === "/" || pathname === "") return "Оценка"
-  if (pathname.startsWith("/cabinet/staff")) return "Организационная структура"
-  if (pathname.startsWith("/admin")) return "Администрирование"
-  return "Раздел"
-}
+import { getSectionTitleForPathname } from "@/lib/nav-config"
 
 export function AppBreadcrumb() {
   const pathname = usePathname()
@@ -34,7 +28,9 @@ export function AppBreadcrumb() {
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
-          <BreadcrumbPage>{sectionTitle(pathname)}</BreadcrumbPage>
+          <BreadcrumbPage>
+            {getSectionTitleForPathname(pathname)}
+          </BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>

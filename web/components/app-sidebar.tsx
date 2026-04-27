@@ -3,7 +3,6 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { ClipboardListIcon, NetworkIcon, SettingsIcon } from "lucide-react"
 
 import {
   Sidebar,
@@ -17,6 +16,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { APP_NAV } from "@/lib/nav-config"
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -36,56 +36,32 @@ export function AppSidebar() {
         </span>
       </SidebarHeader>
       <SidebarContent className="space-y-6">
-        <SidebarGroup>
-          <SidebarGroupLabel>Оценка</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-2">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "/" || pathname === ""}
-                  tooltip="Оценка"
-                >
-                  <Link href="/">
-                    <ClipboardListIcon />
-                    <span>Оценка</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith("/cabinet/staff")}
-                  tooltip="Организационная структура"
-                >
-                  <Link href="/cabinet/staff">
-                    <NetworkIcon />
-                    <span>Организационная структура</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Администрирование</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-2">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith("/admin")}
-                  tooltip="Администрирование"
-                >
-                  <Link href="/admin">
-                    <SettingsIcon />
-                    <span>Администрирование</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {APP_NAV.map((group) => (
+          <SidebarGroup key={group.id}>
+            <SidebarGroupLabel>{group.groupLabel}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-2">
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={item.isActive(pathname)}
+                        tooltip={item.tooltip}
+                      >
+                        <Link href={item.href}>
+                          <Icon />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

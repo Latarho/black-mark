@@ -32,14 +32,14 @@ import {
   searchOrgChartRows,
   type D3OrgChartRow,
 } from "@/lib/org-chart-d3-data"
+import {
+  formatFioMember,
+  sspVspTagClass,
+  unitHeadTagClass,
+  unitLabel,
+} from "@/lib/staff-presentation"
+import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { cn } from "@/lib/utils"
-
-const sspVspTagClass =
-  "inline-flex shrink-0 items-center rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-px text-sm font-semibold leading-none text-sky-700 dark:border-sky-500/45 dark:bg-sky-500/15 dark:text-sky-300"
-
-/** Тег «Руководитель» в списках и дроуере. На органиграмме — иконка `shield-user` в углу карточки. */
-const unitHeadTagClass =
-  "inline-flex shrink-0 items-center rounded-md border border-primary/45 bg-primary/12 px-1.5 py-px text-[11px] font-semibold leading-none text-primary"
 
 /** Lucide `shield-user` — маркер руководителя в карточке сотрудника (foreignObject). */
 const STAFF_HEAD_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/></svg>`
@@ -52,65 +52,6 @@ function esc(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
-}
-
-function unitLabel(unit: OrgUnit): string {
-  if (unit.id === ORG_ROOT.id) return "Структура"
-  switch (unit.level) {
-    case "department":
-      return "Департамент"
-    case "management":
-      return "Управление"
-    case "office":
-      return "Отдел"
-    default:
-      return ""
-  }
-}
-
-function formatFio(s: StaffMember): string {
-  return `${s.lastName} ${s.firstName} ${s.patronymic}`
-}
-
-const AVATAR_TONES = [
-  "bg-chart-1/15 text-chart-1",
-  "bg-chart-2/15 text-chart-2",
-  "bg-chart-3/15 text-chart-3",
-  "bg-chart-4/15 text-chart-4",
-  "bg-chart-5/15 text-chart-5",
-] as const
-
-function staffInitials(s: StaffMember): string {
-  const a = s.lastName.trim().at(0) ?? ""
-  const b = s.firstName.trim().at(0) ?? ""
-  return `${a}${b}`.toUpperCase()
-}
-
-function avatarToneClass(id: string): string {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return AVATAR_TONES[Math.abs(h) % AVATAR_TONES.length]
-}
-
-function StaffAvatar({
-  member,
-  className,
-}: {
-  member: StaffMember
-  className?: string
-}) {
-  return (
-    <div
-      className={cn(
-        "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-        avatarToneClass(member.id),
-        className
-      )}
-      aria-hidden
-    >
-      {staffInitials(member)}
-    </div>
-  )
 }
 
 function staffAvatarTone(id: string, dark: boolean): { bg: string; fg: string } {
@@ -556,13 +497,15 @@ export function D3OrgChartView() {
             <>
               <SheetHeader>
                 <div className="flex flex-row items-start gap-4">
-                  <StaffAvatar
+                  <StaffMemberAvatar
                     member={detailStaff}
                     className="size-14 text-base"
+                    initials="staff"
+                    aria-hidden
                   />
                   <div className="flex min-w-0 flex-col gap-1">
                     <SheetTitle className="flex flex-wrap items-center gap-2 text-base leading-snug">
-                      {formatFio(detailStaff)}
+                      {formatFioMember(detailStaff)}
                       {detailStaff.isUnitHead ? (
                         <span className={unitHeadTagClass}>Руководитель</span>
                       ) : null}
@@ -668,13 +611,15 @@ export function D3OrgChartView() {
                       {staffLineManagers.map((m) => (
                         <li key={m.id}>
                           <div className="flex min-w-0 items-start gap-3">
-                            <StaffAvatar
+                            <StaffMemberAvatar
                               member={m}
                               className="size-10 shrink-0 text-sm"
+                              initials="staff"
+                              aria-hidden
                             />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium leading-snug">
-                                {formatFio(m)}
+                                {formatFioMember(m)}
                               </p>
                               <p className="mt-0.5 text-sm text-muted-foreground">
                                 {m.position}
@@ -723,7 +668,7 @@ export function D3OrgChartView() {
                           Руководитель
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {formatFio(h)} — {h.position}
+                          {formatFioMember(h)} — {h.position}
                         </p>
                       </div>
                     </>

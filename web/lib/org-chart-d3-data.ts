@@ -6,6 +6,7 @@ import {
   type StaffMember,
   getBreadcrumb,
 } from "@/lib/bank-org-mock"
+import { formatFioMember, orgUnitLevelLabel, staffAvatarInitials } from "@/lib/staff-presentation"
 
 export type D3OrgChartRowKind = "unit" | "staff"
 
@@ -23,29 +24,6 @@ export type D3OrgChartRow = {
   headFio?: string
   /** Руководитель подразделения в списке сотрудников на графе. */
   isUnitHead?: boolean
-}
-
-function levelRu(level: OrgUnit["level"]): string {
-  switch (level) {
-    case "department":
-      return "Департамент"
-    case "management":
-      return "Управление"
-    case "office":
-      return "Отдел"
-    default:
-      return ""
-  }
-}
-
-function formatFio(s: StaffMember): string {
-  return `${s.lastName} ${s.firstName} ${s.patronymic}`
-}
-
-function staffInitials(s: StaffMember): string {
-  const a = s.lastName.trim().at(0) ?? ""
-  const b = s.firstName.trim().at(0) ?? ""
-  return `${a}${b}`.toUpperCase()
 }
 
 function collectUnits(
@@ -73,10 +51,10 @@ export function buildD3OrgChartRows(): D3OrgChartRow[] {
     rows.push({
       id: s.id,
       parentId: s.unitId,
-      name: formatFio(s),
+      name: formatFioMember(s),
       role: s.position,
       kind: "staff",
-      initials: staffInitials(s),
+      initials: staffAvatarInitials(s),
       ...(s.isUnitHead ? { isUnitHead: true as const } : {}),
     })
   }
@@ -89,7 +67,7 @@ export function buildD3OrgChartRows(): D3OrgChartRow[] {
     if (r.kind !== "unit") return r
     const h = headByUnit.get(r.id)
     if (!h) return r
-    return { ...r, headFio: formatFio(h) }
+    return { ...r, headFio: formatFioMember(h) }
   })
 }
 
@@ -100,7 +78,7 @@ export function getOrgChartRowSearchBlob(row: D3OrgChartRow): string {
     parts.push(row.role)
     if (row.isUnitHead) parts.push("руководитель")
   } else if (row.kind === "unit" && row.unitLevel) {
-    parts.push(levelRu(row.unitLevel))
+    parts.push(orgUnitLevelLabel(row.unitLevel))
     if (row.id !== ORG_ROOT.id) {
       parts.push(activityDirectionLabel(row.id), "направление деятельности")
     }

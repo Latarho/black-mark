@@ -24,69 +24,20 @@ import {
   type OrgUnit,
   type StaffMember,
   collectUnitIds,
-  countStaffDirect,
   countStaffInSubtree,
   findUnit,
   getBreadcrumb,
   activityDirectionLabel,
 } from "@/lib/bank-org-mock"
+import {
+  formatFioMember,
+  sspVspTagClass,
+  STAFF_TABLE_PAGE_SIZE_OPTIONS,
+  unitHeadTagClass,
+  unitLabel,
+} from "@/lib/staff-presentation"
+import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { cn } from "@/lib/utils"
-
-const sspVspTagClass =
-  "inline-flex shrink-0 items-center rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-px text-sm font-semibold leading-none text-sky-700 dark:border-sky-500/45 dark:bg-sky-500/15 dark:text-sky-300"
-
-function unitLabel(unit: OrgUnit): string {
-  if (unit.id === ORG_ROOT.id) return "Структура"
-  switch (unit.level) {
-    case "department":
-      return "Департамент"
-    case "management":
-      return "Управление"
-    case "office":
-      return "Отдел"
-    default:
-      return ""
-  }
-}
-
-function formatFio(s: StaffMember): string {
-  return `${s.lastName} ${s.firstName} ${s.patronymic}`
-}
-
-const AVATAR_TONES = [
-  "bg-chart-1/15 text-chart-1",
-  "bg-chart-2/15 text-chart-2",
-  "bg-chart-3/15 text-chart-3",
-  "bg-chart-4/15 text-chart-4",
-  "bg-chart-5/15 text-chart-5",
-] as const
-const STAFF_TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
-
-function staffInitials(s: StaffMember): string {
-  const a = s.lastName.trim().at(0) ?? ""
-  const b = s.firstName.trim().at(0) ?? ""
-  return `${a}${b}`.toUpperCase()
-}
-
-function avatarToneClass(id: string): string {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return AVATAR_TONES[Math.abs(h) % AVATAR_TONES.length]
-}
-
-function StaffAvatar({ member }: { member: StaffMember }) {
-  return (
-    <div
-      className={cn(
-        "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-        avatarToneClass(member.id)
-      )}
-      aria-hidden
-    >
-      {staffInitials(member)}
-    </div>
-  )
-}
 
 function TreeNodeRow({
   node,
@@ -235,7 +186,7 @@ export function StaffOrgExplorer() {
     if (!q) return baseStaff
     return baseStaff.filter((s) => {
       const blob = [
-        formatFio(s),
+        formatFioMember(s),
         s.position,
         s.personnelNumber,
         getBreadcrumb(ORG_ROOT, s.unitId)
@@ -428,14 +379,19 @@ export function StaffOrgExplorer() {
                         >
                           <td className="min-w-0 px-3 py-2 align-middle">
                             <div className="flex min-w-0 items-center gap-3">
-                              <StaffAvatar member={s} />
+                              <StaffMemberAvatar
+                                member={s}
+                                className="size-9 text-sm"
+                                initials="staff"
+                                aria-hidden
+                              />
                               <div className="flex min-w-0 flex-1 items-center gap-2">
                                 <span className="min-w-0 truncate font-medium">
-                                  {formatFio(s)}
+                                  {formatFioMember(s)}
                                 </span>
                                 {s.isUnitHead ? (
                                   <span
-                                    className="inline-flex shrink-0 items-center rounded-md border border-primary/45 bg-primary/12 px-1.5 py-px text-[11px] font-semibold leading-none text-primary"
+                                    className={unitHeadTagClass}
                                     title="Руководитель подразделения"
                                   >
                                     Руководитель
