@@ -639,6 +639,13 @@ const CRITICALITY_LEVEL_LABELS: Record<AssessmentGradeLevel, string> = {
   D: "D",
   E: "E",
 }
+const ASSESSMENT_GRADE_HINTS: Partial<Record<AssessmentGradeLevel, string>> = {
+  A: "Удерживаем, ищем индивидуальные решения - первый приоритет для удержания",
+  B: "Работаем с мотивацией, поддерживаем, развиваем. Второй приоритет для удержания",
+  C: "Поддерживаем, развиваем. Третий приоритет для удержания",
+  D: "Повышаем эффективность / переориентируем на новые задачи / переводим у другое ССП / Блок",
+  E: "Расстаемся, ищем замену / оптимизируем",
+}
 const TABLE_TAG_TEXT_CLASS = "text-xs font-normal"
 
 function DetailSection({
@@ -689,10 +696,30 @@ function DetailItem({
       <TooltipTrigger asChild>
         {content}
       </TooltipTrigger>
-      <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
-        {insight}
-      </TooltipContent>
+      <StructuredTooltipContent title={label}>
+        <div className="space-y-1 text-sm text-muted-foreground">{insight}</div>
+      </StructuredTooltipContent>
     </Tooltip>
+  )
+}
+
+function StructuredTooltipContent({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children?: ReactNode
+}) {
+  return (
+    <TooltipContent className="max-w-sm bg-popover p-3 text-popover-foreground text-sm leading-relaxed">
+      <div className="space-y-1.5">
+        <p className="font-semibold text-foreground">{title}</p>
+        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+        {children ? <div className="space-y-1 text-sm text-muted-foreground">{children}</div> : null}
+      </div>
+    </TooltipContent>
   )
 }
 
@@ -1001,6 +1028,7 @@ export default function AssessmentPage() {
   const [positionSearchQuery, setPositionSearchQuery] = useState("")
   const [unitSearchQuery, setUnitSearchQuery] = useState("")
   const [criticalityFilters, setCriticalityFilters] = useState<AssessmentGradeLevel[]>([])
+  const [showNotFormedCriticalityFilter, setShowNotFormedCriticalityFilter] = useState(false)
   const [salaryMarketFilters, setSalaryMarketFilters] = useState<SalaryMarketLevel[]>([])
   const [fkrStatusFilters, setFkrStatusFilters] = useState<FkrStatus[]>([])
   const [overtimeFilter, setOvertimeFilter] = useState<OvertimeFilter>("all")
@@ -1071,12 +1099,14 @@ export default function AssessmentPage() {
         .toLowerCase()
 
       const currentSalaryMarketLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
-      const currentCriticality: AssessmentGradeLevel = getAssessmentGradeForMember(
-        member,
-        salaryMarketLevelOverrides,
-        employeeCategoryOverrides,
-        resignationProbabilityOverrides
-      )
+      const currentCategory =
+        employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, currentSalaryMarketLevel)
+      const currentProbability =
+        resignationProbabilityOverrides[member.id] ?? getResignationProbability(member, currentSalaryMarketLevel)
+      const { isFormed: hasCriticality } = hasRequiredAssessment(currentCategory, currentProbability)
+      const currentCriticality: AssessmentGradeLevel = hasCriticality
+        ? getAssessmentGrade(currentCategory, currentProbability)
+        : "E"
       const currentFkrStatus: FkrStatus = member.fkrStatus ?? "not-included"
       const currentSurveyResultCategory: SurveyCategoryLevel = member.surveyResultCategory ?? "middle"
       const currentSurveyInteractionCategory: SurveyCategoryLevel = member.surveyInteractionCategory ?? "middle"
@@ -1098,7 +1128,8 @@ export default function AssessmentPage() {
         (!globalQuery || searchText.includes(globalQuery)) &&
         (!fioQuery || fio.toLowerCase().includes(fioQuery)) &&
         (selectedPositionIds.length === 0 || selectedPositions.has(member.position)) &&
-        (selectedCriticality.size === 0 || selectedCriticality.has(currentCriticality)) &&
+        ((selectedCriticality.size === 0 || selectedCriticality.has(currentCriticality)) ||
+          (showNotFormedCriticalityFilter && !hasCriticality)) &&
         (selectedSalaryFilters.size === 0 || selectedSalaryFilters.has(currentSalaryMarketLevel)) &&
         (selectedFkrFilters.size === 0 || selectedFkrFilters.has(currentFkrStatus)) &&
         (overtimeFilter === "all" || overtimeFilter === currentOvertime) &&
@@ -1114,6 +1145,7 @@ export default function AssessmentPage() {
     selectedPositionIds,
     staffInUnit,
     staffSearchQuery,
+    showNotFormedCriticalityFilter,
     criticalityFilters,
     salaryMarketFilters,
     fkrStatusFilters,
@@ -1127,29 +1159,72 @@ export default function AssessmentPage() {
     resignationProbabilityOverrides,
   ])
 
+  const filteredStaffForGradeSummary = useMemo(() => {
+    const globalQuery = staffSearchQuery.trim().toLowerCase()
+    const fioQuery = fioFilterQuery.trim().toLowerCase()
+    const selectedPositions = new Set(selectedPositionIds)
+
+    return staffInUnit.filter((member) => {
+      const unitPath = getBreadcrumb(ORG_ROOT, member.unitId)
+        .filter((unit) => unit.id !== ORG_ROOT.id)
+        .map((unit) => unit.name)
+        .join(" / ")
+      const fio = formatFio(member.lastName, member.firstName, member.patronymic)
+      const searchText = [fio, member.position, unitPath].join(" ").toLowerCase()
+
+      const currentSalaryMarketLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
+      const currentFkrStatus: FkrStatus = member.fkrStatus ?? "not-included"
+      const currentSurveyResultCategory: SurveyCategoryLevel = member.surveyResultCategory ?? "middle"
+      const currentSurveyInteractionCategory: SurveyCategoryLevel = member.surveyInteractionCategory ?? "middle"
+      const currentOvertime: OvertimeFilter = hasOvertime(member) ? "yes" : "no"
+      const currentRhythmSignal: RhythmExternalFilter =
+        member.rhythmAssessmentResult === undefined
+          ? "not-available"
+          : member.rhythmAssessmentResult >= 4
+            ? "yes"
+            : "no"
+      const currentExternalSignal: RhythmExternalFilter =
+        member.externalAssessmentResult === undefined
+          ? "not-available"
+          : member.externalAssessmentResult >= 4
+            ? "yes"
+            : "no"
+      const selectedSalaryFilters = new Set(salaryMarketFilters)
+      const selectedFkrFilters = new Set(fkrStatusFilters)
+      const selectedSurveyResultFilters = new Set(surveyResultFilters)
+      const selectedSurveyInteractionFilters = new Set(surveyInteractionFilters)
+
+      return (
+        (!globalQuery || searchText.includes(globalQuery)) &&
+        (!fioQuery || fio.toLowerCase().includes(fioQuery)) &&
+        (selectedPositionIds.length === 0 || selectedPositions.has(member.position)) &&
+        (selectedSalaryFilters.size === 0 || selectedSalaryFilters.has(currentSalaryMarketLevel)) &&
+        (selectedFkrFilters.size === 0 || selectedFkrFilters.has(currentFkrStatus)) &&
+        (overtimeFilter === "all" || overtimeFilter === currentOvertime) &&
+        (rhythmAssessmentFilter === "all" || rhythmAssessmentFilter === currentRhythmSignal) &&
+        (externalAssessmentFilter === "all" || externalAssessmentFilter === currentExternalSignal) &&
+        (selectedSurveyResultFilters.size === 0 || selectedSurveyResultFilters.has(currentSurveyResultCategory)) &&
+        (selectedSurveyInteractionFilters.size === 0 ||
+          selectedSurveyInteractionFilters.has(currentSurveyInteractionCategory))
+      )
+    })
+  }, [
+    salaryMarketFilters,
+    fkrStatusFilters,
+    overtimeFilter,
+    rhythmAssessmentFilter,
+    externalAssessmentFilter,
+    surveyResultFilters,
+    surveyInteractionFilters,
+    staffInUnit,
+    staffSearchQuery,
+    fioFilterQuery,
+    selectedPositionIds,
+    salaryMarketLevelOverrides,
+  ])
+
   const sortedStaff = useMemo(() => {
     return [...filteredStaff].sort((a, b) => {
-      const criticalityDelta =
-        getCriticalityRank(
-          a,
-          salaryMarketLevelOverrides,
-          employeeCategoryOverrides,
-          resignationProbabilityOverrides
-        ) -
-        getCriticalityRank(
-          b,
-          salaryMarketLevelOverrides,
-          employeeCategoryOverrides,
-          resignationProbabilityOverrides
-        )
-      if (criticalityDelta !== 0) return criticalityDelta
-
-      const aSalary = getEffectiveSalaryMarketLevel(a, salaryMarketLevelOverrides)
-      const bSalary = getEffectiveSalaryMarketLevel(b, salaryMarketLevelOverrides)
-      const riskDelta =
-        getRiskReasons(b, bSalary).length - getRiskReasons(a, aSalary).length
-      if (riskDelta !== 0) return riskDelta
-
       return formatFio(a.lastName, a.firstName, a.patronymic).localeCompare(
         formatFio(b.lastName, b.firstName, b.patronymic)
       )
@@ -1160,6 +1235,39 @@ export default function AssessmentPage() {
     employeeCategoryOverrides,
     resignationProbabilityOverrides,
   ])
+  const assessmentGradeDistribution = useMemo(() => {
+    const result: Record<AssessmentGradeLevel | "not-formed", number> = {
+      A: 0,
+      B: 0,
+      C: 0,
+      D: 0,
+      E: 0,
+      "not-formed": 0,
+    }
+
+    filteredStaffForGradeSummary.forEach((member) => {
+      const salaryLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
+      const category = employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, salaryLevel)
+      const probability =
+        resignationProbabilityOverrides[member.id] ?? getResignationProbability(member, salaryLevel)
+      const { isFormed } = hasRequiredAssessment(category, probability)
+      const grade = isFormed ? getAssessmentGrade(category, probability) : "not-formed"
+
+      result[grade] += 1
+    })
+
+    return result
+  }, [
+    filteredStaffForGradeSummary,
+    salaryMarketLevelOverrides,
+    employeeCategoryOverrides,
+    resignationProbabilityOverrides,
+  ])
+  const assessmentSummaryTotal = filteredStaffForGradeSummary.length
+  const getAssessmentSummaryPercent = (value: number) => {
+    if (assessmentSummaryTotal === 0) return 0
+    return Math.round((value / assessmentSummaryTotal) * 100)
+  }
   const totalStaffItems = filteredStaff.length
   const staffPages = Math.max(1, Math.ceil(totalStaffItems / staffPageSize))
   const safeStaffPage = Math.min(staffPage, staffPages)
@@ -1173,6 +1281,7 @@ export default function AssessmentPage() {
     (fioFilterQuery.trim() ? 1 : 0) +
     selectedPositionIds.length +
     criticalityFilters.length +
+    (showNotFormedCriticalityFilter ? 1 : 0) +
     salaryMarketFilters.length +
     fkrStatusFilters.length +
     (overtimeFilter === "all" ? 0 : 1) +
@@ -1413,6 +1522,15 @@ export default function AssessmentPage() {
         label: `Результат оценки: ${CRITICALITY_LEVEL_LABELS[item]}`,
         onClear: undefined,
       })),
+      ...(showNotFormedCriticalityFilter
+        ? [
+            {
+              id: "criticality-not-formed",
+              label: "Результат оценки: Не сформирован",
+              onClear: undefined,
+            },
+          ]
+        : []),
       ...salaryMarketFilters.map((item) => ({
         id: `salary-${item}`,
         label: `З/П к рынку: ${SALARY_MARKET_LEVEL_LABELS[item]}`,
@@ -1470,6 +1588,7 @@ export default function AssessmentPage() {
       selectedPositionIds,
       fioFilterQuery,
       criticalityFilters,
+      showNotFormedCriticalityFilter,
       salaryMarketFilters,
       fkrStatusFilters,
       overtimeFilter,
@@ -1519,6 +1638,7 @@ export default function AssessmentPage() {
     setPositionSearchQuery("")
     setUnitSearchQuery("")
     setCriticalityFilters([])
+    setShowNotFormedCriticalityFilter(false)
     setSalaryMarketFilters([])
     setFkrStatusFilters([])
     setOvertimeFilter("all")
@@ -1527,6 +1647,26 @@ export default function AssessmentPage() {
     setSurveyResultFilters([])
     setSurveyInteractionFilters([])
     resetSelectedUnits()
+    setStaffPage(1)
+    setNineBoxCellDetail(null)
+  }
+
+  const clearNotFormedCriticalityFilter = () => {
+    setShowNotFormedCriticalityFilter(false)
+    setStaffPage(1)
+    setNineBoxCellDetail(null)
+  }
+
+  const handleAssessmentBadgeFilter = (grade: AssessmentGradeLevel) => {
+    setShowNotFormedCriticalityFilter(false)
+    setCriticalityFilters((prev) => (prev.length === 1 && prev[0] === grade ? [] : [grade]))
+    setStaffPage(1)
+    setNineBoxCellDetail(null)
+  }
+
+  const handleNotFormedCriticalityFilter = () => {
+    setCriticalityFilters([])
+    setShowNotFormedCriticalityFilter((prev) => !prev)
     setStaffPage(1)
     setNineBoxCellDetail(null)
   }
@@ -1710,6 +1850,19 @@ export default function AssessmentPage() {
                     </button>
                   </span>
                 ) : null}
+                {showNotFormedCriticalityFilter ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">Результат оценки: Не сформирован</span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по не сформированным оценкам"
+                      onClick={clearNotFormedCriticalityFilter}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
                 {salaryMarketFilters.length > 0 ? (
                   <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
                     <span className="truncate">
@@ -1855,6 +2008,59 @@ export default function AssessmentPage() {
                 ))}
               </div>
             ) : null}
+            <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+              <span className="text-sm font-medium text-muted-foreground">Результат оценки:</span>
+              <span className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-2.5 py-1 text-sm text-foreground">
+                <Users size={14} className="text-foreground/80" />
+                <span className="text-muted-foreground">Сотрудников:</span>
+                <span className="inline-flex min-w-6 justify-center rounded-full border border-border bg-background px-2 py-0.5 font-semibold">
+                  {filteredStaffForGradeSummary.length}
+                </span>
+              </span>
+              {(["A", "B", "C", "D", "E"] as const).map((grade) => (
+                <button
+                  type="button"
+                  key={grade}
+                  onClick={() => handleAssessmentBadgeFilter(grade)}
+                  className={`inline-flex min-w-0 items-center gap-2 rounded-lg border px-2 py-1 transition-colors hover:bg-muted/30 ${
+                    criticalityFilters.length === 1 && criticalityFilters[0] === grade
+                      ? "border-foreground/60 bg-muted/40"
+                      : "border-border bg-muted/20"
+                  }`}
+                >
+                  <span
+                    className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full border px-2 text-xs font-semibold ${CRITICALITY_LEVEL_CLASSES[grade]}`}
+                  >
+                    {grade}
+                  </span>
+                  <span className="inline-flex h-6 min-w-12 items-center justify-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-sm font-semibold text-foreground">
+                    <span>{assessmentGradeDistribution[grade]}</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      ({getAssessmentSummaryPercent(assessmentGradeDistribution[grade])}%)
+                    </span>
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handleNotFormedCriticalityFilter}
+                className={`inline-flex min-w-0 items-center gap-2 rounded-lg border px-2 py-1 transition-colors hover:bg-muted/30 ${
+                  showNotFormedCriticalityFilter
+                    ? "border-foreground/60 bg-muted/40"
+                    : "border-border bg-muted/20"
+                }`}
+              >
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/60 bg-muted/40 px-2 text-xs font-semibold text-muted-foreground">
+                  Не сформирован
+                </span>
+                <span className="inline-flex h-6 min-w-12 items-center justify-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-sm font-semibold text-foreground">
+                  <span>{assessmentGradeDistribution["not-formed"]}</span>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    ({getAssessmentSummaryPercent(assessmentGradeDistribution["not-formed"])}%)
+                  </span>
+                </span>
+              </button>
+            </div>
             <Dialog open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
               <DialogContent className="max-h-[90vh] w-[96vw] max-w-[1440px] gap-0 overflow-hidden p-0">
                 <DialogHeader className="border-b border-border px-6 py-4">
@@ -2201,11 +2407,13 @@ export default function AssessmentPage() {
                             <TooltipTrigger asChild>
                               <span>Переработки</span>
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
-                              Признак наличия переработок за последний месяц.
-                              {" "}
-                              Значение ДА — есть сверхурочные часы.
-                            </TooltipContent>
+                    <StructuredTooltipContent
+                      title="Переработки"
+                      description="Признак наличия переработок за последний месяц."
+                    >
+                      <p>ДА — есть сверхурочные часы.</p>
+                      <p>НЕТ — сверхурочных часов нет.</p>
+                    </StructuredTooltipContent>
                           </Tooltip>
                         </th>
                         <th className="px-2 py-2 font-medium">
@@ -2213,9 +2421,13 @@ export default function AssessmentPage() {
                             <TooltipTrigger asChild>
                               <span>РИТМ</span>
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
-                              ДА — если РИТМ оценки ≥ 4, НЕТ — если &lt; 4.
-                            </TooltipContent>
+                    <StructuredTooltipContent
+                      title="РИТМ"
+                      description="Критерий по внутренней оценке регулярности работы."
+                    >
+                      <p>ДА — если РИТМ оценки ≥ 4.</p>
+                      <p>НЕТ — если &lt; 4.</p>
+                    </StructuredTooltipContent>
                           </Tooltip>
                         </th>
                         <th className="px-2 py-2 font-medium">
@@ -2223,9 +2435,13 @@ export default function AssessmentPage() {
                             <TooltipTrigger asChild>
                               <span>Внешняя оценка</span>
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
-                              ДА — если внешняя оценка ≥ 4, НЕТ — если &lt; 4.
-                            </TooltipContent>
+                    <StructuredTooltipContent
+                      title="Внешняя оценка"
+                      description="Внешний контроль и обратная связь по сотруднику."
+                    >
+                      <p>ДА — если внешняя оценка ≥ 4.</p>
+                      <p>НЕТ — если &lt; 4.</p>
+                    </StructuredTooltipContent>
                           </Tooltip>
                         </th>
                         <th className="px-2 py-2 font-medium">
@@ -2233,9 +2449,10 @@ export default function AssessmentPage() {
                             <TooltipTrigger asChild>
                               <span>Опрос результат</span>
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
-                              Опрос - категория по вкладу в результат
-                            </TooltipContent>
+                    <StructuredTooltipContent
+                      title="Опрос: результат"
+                      description="Категория по вкладу в достижение результатов."
+                    />
                           </Tooltip>
                         </th>
                         <th className="px-2 py-2 font-medium">
@@ -2243,9 +2460,10 @@ export default function AssessmentPage() {
                             <TooltipTrigger asChild>
                               <span>Опрос команда</span>
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
-                              Опрос - категория по команде
-                            </TooltipContent>
+                    <StructuredTooltipContent
+                      title="Опрос: команда"
+                      description="Категория по командному взаимодействию."
+                    />
                           </Tooltip>
                         </th>
                       </>
@@ -2325,11 +2543,30 @@ export default function AssessmentPage() {
                         </td>
                         <td className="min-w-0 border-l border-border bg-muted/20 px-2 py-2 text-center align-middle">
                           {isGradeFormed ? (
-                            <span
-                              className={`inline-flex min-h-7 min-w-9 items-center justify-center rounded-full border font-semibold ${CRITICALITY_LEVEL_CLASSES[assessmentGrade]}`}
-                            >
-                              {CRITICALITY_LEVEL_LABELS[assessmentGrade]}
-                            </span>
+                            ASSESSMENT_GRADE_HINTS[assessmentGrade] ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`inline-flex min-h-7 min-w-9 items-center justify-center rounded-full border font-semibold ${CRITICALITY_LEVEL_CLASSES[assessmentGrade]}`}
+                                  >
+                                    {CRITICALITY_LEVEL_LABELS[assessmentGrade]}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-sm bg-popover text-popover-foreground text-sm leading-relaxed">
+                                <div className="space-y-2">
+                                    <p className="font-semibold">Результат оценки</p>
+                                  <p className="text-sm text-muted-foreground">Текущая рекомендации по удержанию:</p>
+                                  <p className="text-sm text-muted-foreground">{ASSESSMENT_GRADE_HINTS[assessmentGrade]}</p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span
+                                className={`inline-flex min-h-7 min-w-9 items-center justify-center rounded-full border font-semibold ${CRITICALITY_LEVEL_CLASSES[assessmentGrade]}`}
+                              >
+                                {CRITICALITY_LEVEL_LABELS[assessmentGrade]}
+                              </span>
+                            )
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -2340,8 +2577,8 @@ export default function AssessmentPage() {
                               <TooltipContent className="max-w-sm bg-popover text-popover-foreground text-sm leading-relaxed">
                                 <div className="space-y-2">
                                   <p className="font-semibold">Результат оценки не сформирован</p>
-                                  <p className="text-xs text-muted-foreground">Для формирования результата оценки заполните:</p>
-                                  <ul className="space-y-1 text-xs text-muted-foreground">
+                                  <p className="text-sm text-muted-foreground">Для формирования результата оценки заполните:</p>
+                                  <ul className="space-y-1 text-sm text-muted-foreground">
                                     {missingFields.map((item) => (
                                       <li
                                         key={item}
@@ -2352,7 +2589,7 @@ export default function AssessmentPage() {
                                       </li>
                                     ))}
                                   </ul>
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-sm text-muted-foreground">
                                     После выбора значений оценка пересчитывается автоматически.
                                   </p>
                                 </div>
@@ -2591,9 +2828,10 @@ export default function AssessmentPage() {
                                       </p>
                                     </div>
                                   </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
-                                    Организационный контекст сотрудника. Важен для сопоставления роли, нагрузки, руководителя и кадровых решений.
-                                  </TooltipContent>
+                                <StructuredTooltipContent
+                                  title="Подразделение"
+                                  description="Организационный контекст сотрудника важен для сопоставления роли, нагрузки, руководителя и кадровых решений."
+                                />
                                 </Tooltip>
                               </div>
                             </div>
@@ -2615,9 +2853,10 @@ export default function AssessmentPage() {
                                     </dd>
                                   </div>
                                 </TooltipTrigger>
-                                <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
-                                  Итоговый приоритет внимания к сотруднику. Значение формирует быстрый фокус для управленческого решения.
-                                </TooltipContent>
+                                <StructuredTooltipContent
+                                  title="Результат оценки"
+                                  description="Итоговый приоритет внимания к сотруднику."
+                                />
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -2630,9 +2869,10 @@ export default function AssessmentPage() {
                                     </dd>
                                   </div>
                                 </TooltipTrigger>
-                                <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
-                                  Быстрый признак включения в кадровый контур. Помогает понять, есть ли по сотруднику отдельный фокус развития.
-                                </TooltipContent>
+                                <StructuredTooltipContent
+                                  title="ФКР"
+                                  description="Быстрый признак включения в кадровый контур. Показывает, есть ли отдельный фокус развития."
+                                />
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -2645,9 +2885,10 @@ export default function AssessmentPage() {
                                     </dd>
                                   </div>
                                 </TooltipTrigger>
-                                <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
-                                  Краткий компенсационный сигнал. Нужен для оценки риска удержания и приоритизации пересмотра оклада.
-                                </TooltipContent>
+                                <StructuredTooltipContent
+                                  title="З/П к рынку"
+                                  description="Краткий компенсационный сигнал для оценки риска удержания и приоритизации пересмотра оклада."
+                                />
                               </Tooltip>
                             </dl>
                           </div>
@@ -3046,30 +3287,30 @@ export default function AssessmentPage() {
                               {teamMatrixEmployeeStats.evaluatedByBoth}
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent
-                            side="top"
-                            className="max-w-xs bg-popover p-3 text-popover-foreground text-sm leading-relaxed"
-                          >
-                            <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                              {teamMatrixEmployeeStats.evaluatedMembers.length ? (
-                                teamMatrixEmployeeStats.evaluatedMembers.slice(0, 10).map((member) => (
-                                  <div key={member.id}>
-                                    <div className="font-medium">
-                                      {formatFio(member.lastName, member.firstName, member.patronymic)}
+                            <StructuredTooltipContent
+                              title="Оценены (категория+вероятность)"
+                              description="Сотрудники с заполненными значениями категории и вероятности увольнения."
+                            >
+                              <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                                {teamMatrixEmployeeStats.evaluatedMembers.length ? (
+                                  teamMatrixEmployeeStats.evaluatedMembers.slice(0, 10).map((member) => (
+                                    <div key={member.id}>
+                                      <div className="font-medium">
+                                        {formatFio(member.lastName, member.firstName, member.patronymic)}
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">{member.position}</div>
                                     </div>
-                                    <div className="text-xs text-muted-foreground">{member.position}</div>
+                                  ))
+                                ) : (
+                                  <div className="text-sm text-muted-foreground">Нет оцененных сотрудников</div>
+                                )}
+                                {teamMatrixEmployeeStats.evaluatedMembers.length > 10 ? (
+                                  <div className="pt-1 text-sm text-muted-foreground">
+                                    ... еще {teamMatrixEmployeeStats.evaluatedMembers.length - 10}
                                   </div>
-                                ))
-                              ) : (
-                                <div className="text-xs text-muted-foreground">Нет оцененных сотрудников</div>
-                              )}
-                              {teamMatrixEmployeeStats.evaluatedMembers.length > 10 ? (
-                                <div className="pt-1 text-xs text-muted-foreground">
-                                  ... еще {teamMatrixEmployeeStats.evaluatedMembers.length - 10}
-                                </div>
-                              ) : null}
-                            </div>
-                          </TooltipContent>
+                                ) : null}
+                              </div>
+                            </StructuredTooltipContent>
                         </Tooltip>
                         <span className="text-sm text-foreground">Не оценены</span>
                         <Tooltip>
@@ -3078,30 +3319,30 @@ export default function AssessmentPage() {
                               {teamMatrixEmployeeStats.notEvaluated}
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent
-                            side="top"
-                            className="max-w-xs bg-popover p-3 text-popover-foreground text-sm leading-relaxed"
-                          >
-                            <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                              {teamMatrixEmployeeStats.notEvaluatedMembers.length ? (
-                                teamMatrixEmployeeStats.notEvaluatedMembers.slice(0, 10).map((member) => (
-                                  <div key={member.id}>
-                                    <div className="font-medium">
-                                      {formatFio(member.lastName, member.firstName, member.patronymic)}
+                            <StructuredTooltipContent
+                              title="Не оценены"
+                              description="Сотрудники без полного ввода категории сотрудника или вероятности увольнения."
+                            >
+                              <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                                {teamMatrixEmployeeStats.notEvaluatedMembers.length ? (
+                                  teamMatrixEmployeeStats.notEvaluatedMembers.slice(0, 10).map((member) => (
+                                    <div key={member.id}>
+                                      <div className="font-medium">
+                                        {formatFio(member.lastName, member.firstName, member.patronymic)}
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">{member.position}</div>
                                     </div>
-                                    <div className="text-xs text-muted-foreground">{member.position}</div>
+                                  ))
+                                ) : (
+                                  <div className="text-sm text-muted-foreground">Нет неоцененных сотрудников</div>
+                                )}
+                                {teamMatrixEmployeeStats.notEvaluatedMembers.length > 10 ? (
+                                  <div className="pt-1 text-sm text-muted-foreground">
+                                    ... еще {teamMatrixEmployeeStats.notEvaluatedMembers.length - 10}
                                   </div>
-                                ))
-                              ) : (
-                                <div className="text-xs text-muted-foreground">Нет неоцененных сотрудников</div>
-                              )}
-                              {teamMatrixEmployeeStats.notEvaluatedMembers.length > 10 ? (
-                                <div className="pt-1 text-xs text-muted-foreground">
-                                  ... еще {teamMatrixEmployeeStats.notEvaluatedMembers.length - 10}
-                                </div>
-                              ) : null}
-                            </div>
-                          </TooltipContent>
+                                ) : null}
+                              </div>
+                            </StructuredTooltipContent>
                         </Tooltip>
                       </>
                     ) : null}
@@ -3207,22 +3448,12 @@ export default function AssessmentPage() {
                                               <MiniAvatar member={member} />
                                             </span>
                                           </TooltipTrigger>
-                                          <TooltipContent
-                                            side="top"
-                                            className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed"
-                                          >
-                                            <div className="space-y-1">
-                                              <p className="font-medium">
-                                                {formatFio(member.lastName, member.firstName, member.patronymic)}
-                                              </p>
-                                              <p className="text-xs text-muted-foreground">{member.position}</p>
-                                              {needsEvaluation ? (
-                                                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                                                  Требуется оценить (категория / вероятность увольнения)
-                                                </p>
-                                              ) : null}
-                                            </div>
-                                          </TooltipContent>
+                                      {needsEvaluation ? (
+                                        <StructuredTooltipContent
+                                          title="Требуется оценить"
+                                          description="Заполните категорию сотрудника и вероятность увольнения для попадания в матрицу."
+                                        />
+                                      ) : null}
                                         </Tooltip>
                                         <span className="w-full text-center text-[11px] font-medium leading-tight text-muted-foreground">
                                           {member.lastName} {member.firstName}
