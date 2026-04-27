@@ -105,6 +105,24 @@ export interface StaffMember {
   rhythmAssessmentResult?: number
   /** Внешняя оценка */
   externalAssessmentResult?: number
+  /** Ссылка на PDF с результатами внешней оценки */
+  externalAssessmentResultPdf?: string
+  /** Провайдер внешней оценки */
+  externalAssessmentProvider?: string
+  /** Год проведения внешней оценки */
+  externalAssessmentYear?: number
+  /** Дата пересмотра должности */
+  positionReviewDate?: string
+  /** Дата пересмотра оклада */
+  salaryReviewDate?: string
+  /** Флаг участия в ФКР */
+  fkrStatus?: "included" | "not-included"
+  /** Критичность ситуации */
+  criticalitySituation?: "high" | "medium" | "low"
+  /** Тестовая демонстрационная оценка сотрудника для 12-box: категория сотрудника */
+  managerEmployeeCategory?: "key" | "core" | "second-chance" | "ineffective" | "not-evaluated"
+  /** Тестовая демонстрационная оценка сотрудника для 12-box: вероятность увольнения */
+  managerResignationProbability?: "low" | "medium" | "high" | "not-evaluated"
   /** Человекочитаемо, напр. «9 октября» */
   birthday?: string
   contacts?: {
@@ -148,6 +166,8 @@ function pluralRuMonths(n: number): string {
   return "месяцев"
 }
 
+const EXTERNAL_ASSESSMENT_YEAR = new Date().getFullYear()
+
 function demoProfileForStaff(
   _unitId: string,
   i: number,
@@ -170,6 +190,15 @@ function demoProfileForStaff(
   | "surveyInteractionCategory"
   | "rhythmAssessmentResult"
   | "externalAssessmentResult"
+  | "externalAssessmentResultPdf"
+  | "externalAssessmentProvider"
+  | "externalAssessmentYear"
+  | "positionReviewDate"
+  | "salaryReviewDate"
+  | "fkrStatus"
+  | "criticalitySituation"
+  | "managerEmployeeCategory"
+  | "managerResignationProbability"
   | "birthday"
   | "contacts"
 > {
@@ -188,15 +217,35 @@ function demoProfileForStaff(
   const overtimeComputerAndCallsMinutesLast3Months =
     overtimeComputerMinutesLast3Months + 30 + (h % 180)
   const workMode = ["гибкий режим", "офисный режим", "гибридный режим"][h % 3]
-  const salaryMarketLevel: StaffMember["salaryMarketLevel"] = [
+  const salaryMarketLevel: StaffMember["salaryMarketLevel"] = ([
     "below-median",
     "between-median-and-target",
     "above-market-max",
-  ][h % 3]
-  const surveyResultCategory: StaffMember["surveyResultCategory"] = ["top", "middle", "bottom"][h % 3]
-  const surveyInteractionCategory: StaffMember["surveyInteractionCategory"] = ["bottom", "middle", "top"][h % 3]
+  ] as const)[h % 3]
+  const surveyResultCategory: StaffMember["surveyResultCategory"] = (["top", "middle", "bottom"] as const)[h % 3]
+  const surveyInteractionCategory: StaffMember["surveyInteractionCategory"] = (["bottom", "middle", "top"] as const)[h % 3]
   const rhythmAssessmentResult = 1 + (h % 5)
   const externalAssessmentResult = 1 + ((h + 2) % 5)
+  const externalAssessmentResultPdf = `/reports/external-assessment-${h}.pdf`
+  const externalAssessmentProvider = ["РРК", "Korn Ferry", "Hays", "Mercer"][h % 4]
+  const externalAssessmentYear = EXTERNAL_ASSESSMENT_YEAR
+  const positionReviewDate = `${String(1 + (h % 28)).padStart(2, "0")}.${String((h % 12) + 1).padStart(2, "0")}.${EXTERNAL_ASSESSMENT_YEAR - (h % 3)}`
+  const salaryReviewDate = `${String(1 + ((h + 10) % 28)).padStart(2, "0")}.${String((h * 2 % 12) + 1).padStart(2, "0")}.${EXTERNAL_ASSESSMENT_YEAR - ((h + 1) % 2)}`
+  const fkrStatus: StaffMember["fkrStatus"] = h % 2 === 0 ? "included" : "not-included"
+  const criticalitySituation: StaffMember["criticalitySituation"] = (["high", "medium", "low"] as const)[h % 3]
+  const managerEmployeeCategory: NonNullable<StaffMember["managerEmployeeCategory"]> = ([
+    "not-evaluated",
+    "key",
+    "core",
+    "second-chance",
+    "ineffective",
+  ] as const)[h % 5]
+  const managerResignationProbability: NonNullable<StaffMember["managerResignationProbability"]> = ([
+    "not-evaluated",
+    "low",
+    "medium",
+    "high",
+  ] as const)[h % 4]
   const emailLocal = `user${(h % 90000) + 10000}`
   const tenureParts = [`${years} ${pluralRuYears(years)}`]
   if (months > 0) tenureParts.push(`${months} ${pluralRuMonths(months)}`)
@@ -219,6 +268,15 @@ function demoProfileForStaff(
     surveyInteractionCategory,
     rhythmAssessmentResult,
     externalAssessmentResult,
+    externalAssessmentResultPdf,
+    externalAssessmentProvider,
+    externalAssessmentYear,
+    positionReviewDate,
+    salaryReviewDate,
+    fkrStatus,
+    criticalitySituation,
+    managerEmployeeCategory,
+    managerResignationProbability,
     birthday: `${day} ${MONTHS_GEN[monthIx]}`,
     contacts: {
       workEmail: `${emailLocal}@corp.bank`,

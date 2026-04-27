@@ -33,11 +33,34 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { SearchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react"
-import { useMemo, useState } from "react"
+import {
+  ChevronDown,
+  SearchIcon,
+  MessageSquare,
+  SlidersHorizontalIcon,
+  XIcon,
+  Users,
+} from "lucide-react"
+import { useMemo, useState, type ReactNode } from "react"
 
 function formatFio(lastName: string, firstName: string, patronymic: string): string {
   return `${lastName} ${firstName} ${patronymic}`
+}
+
+type StaffNotebookEntry = {
+  createdAt: string
+  subjectFio: string
+  text: string
+}
+
+function formatNotebookDateTime(date = new Date()): string {
+  const day = String(date.getDate()).padStart(2, "0")
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const year = String(date.getFullYear())
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+
+  return `${day}.${month}.${year} ${hours}:${minutes}`
 }
 
 type UnitOption = {
@@ -67,18 +90,74 @@ const STAFF_TONE_CLASSES = [
   "bg-chart-5/15 text-chart-5",
 ] as const
 
-const nineBoxAxisLabels = {
-  xLabel: "Потенциал",
-  yLabel: "Производительность",
-  x: ["Низкий", "Средний", "Высокий"],
-  y: ["Низкий", "Средний", "Высокий"],
+const SURVEY_NINE_BOX_AXIS_LABELS = {
+  xLabel: "ВКЛАД В ДОСТИЖЕНИЕ РЕЗУЛЬТАТОВ",
+  yLabel: "КОМАНДНОЕ ВЗАИМОДЕЙСТВИЕ",
+  x: ["BOTTOM", "MIDDLE", "TOP"],
+  y: ["BOTTOM", "MIDDLE", "TOP"],
 }
-const nineBoxColumnRolesByRow = [
-  ["Будущий лидер", "Высокий потенциал", "Звезда"],
-  ["Требует внимания", "Средний", "Перспективный"],
-  ["Отстающий", "Тоже требует внимания", "Темные лошадки"],
+
+const MANAGER_TWELVE_BOX_AXIS_LABELS = {
+  xLabel: "КАТЕГОРИЯ СОТРУДНИКА",
+  yLabel: "ВЕРОЯТНОСТЬ УВОЛЬНЕНИЯ",
+  x: ["НЕЭФФЕКТИВНЫЙ", "ВТОРОЙ ШАНС", "ОСНОВНОЙ СОСТАВ", "КЛЮЧЕВОЙ"],
+  y: ["ВЫСОКАЯ", "СРЕДНЯЯ", "НИЗКАЯ"],
+}
+
+const TEAM_MATRIX_AXIS_LABELS: Record<
+  TeamMatrixMode,
+  {
+    xLabel: string
+    yLabel: string
+    x: string[]
+    y: string[]
+  }
+> = {
+  "survey-nine-box": SURVEY_NINE_BOX_AXIS_LABELS,
+  "manager-twelve-box": MANAGER_TWELVE_BOX_AXIS_LABELS,
+}
+
+const SURVEY_NINE_BOX_X_LEVEL_TO_INDEX: Record<SurveyCategoryLevel, number> = {
+  top: 2,
+  middle: 1,
+  bottom: 0,
+}
+const SURVEY_NINE_BOX_Y_LEVEL_TO_INDEX: Record<SurveyCategoryLevel, number> = {
+  top: 0,
+  middle: 1,
+  bottom: 2,
+}
+
+const TEAM_MATRIX_CELL_TONE: string[] = [
+  "bg-red-100 text-red-900 border-red-200 dark:bg-red-950/50 dark:text-red-200 dark:border-red-900/70",
+  "bg-orange-100 text-orange-900 border-orange-200 dark:bg-orange-950/45 dark:text-orange-200 dark:border-orange-900/60",
+  "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900/55",
+  "bg-lime-100 text-lime-900 border-lime-200 dark:bg-lime-950/35 dark:text-lime-200 dark:border-lime-900/55",
+  "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-950/35 dark:text-emerald-200 dark:border-emerald-900/55",
+  "bg-emerald-200 text-emerald-950 border-emerald-300 dark:bg-emerald-950/25 dark:text-emerald-100 dark:border-emerald-700/55",
 ]
-const nineBoxMatrixRows = [[6, 7, 8], [3, 4, 5], [0, 1, 2]] as const
+
+function getTeamMatrixCellTone(
+  xIndex: number,
+  yIndex: number,
+  rowCount: number,
+  mode: TeamMatrixMode
+): string {
+  const xScore = xIndex
+  const yScore = mode === "manager-twelve-box" ? yIndex : rowCount - 1 - yIndex
+  const toneIndex = Math.max(0, Math.min(TEAM_MATRIX_CELL_TONE.length - 1, xScore + yScore))
+  return TEAM_MATRIX_CELL_TONE[toneIndex]
+}
+
+function getMatrixCellRows(colCount: number, rowCount: number, isManagerTwelveBox: boolean): number[][] {
+  return Array.from({ length: rowCount }, (_, rowIndex) =>
+    Array.from(
+      { length: colCount },
+      (_, colIndex) =>
+        (isManagerTwelveBox ? rowIndex : rowCount - 1 - rowIndex) * colCount + colIndex
+    )
+  )
+}
 
 type NineBoxRoleProfile = {
   summary: string
@@ -390,30 +469,8 @@ function makeInitials(lastName: string, firstName: string, patronymic: string): 
     .slice(0, 2)
 }
 
-function parseTenureMonths(value?: string): number | null {
-  if (!value) return null
-  const yearsMatch = value.match(/(\d+)\s*(?:год|года|лет)/i)
-  const monthsMatch = value.match(/(\d+)\s*(?:месяц|месяца|месяцев)/i)
-  const years = yearsMatch ? Number(yearsMatch[1]) : 0
-  const months = monthsMatch ? Number(monthsMatch[1]) : 0
-  if (Number.isNaN(years) || Number.isNaN(months)) return null
-  return years * 12 + months
-}
-
-function parseTenureYears(value?: string): number | null {
-  if (!value) return null
-  const yearsMatch = value.match(/(\d+)\s*(?:год|года|лет)/i)
-  if (!yearsMatch) return null
-  const years = Number(yearsMatch[1])
-  return Number.isNaN(years) ? null : years
-}
-
-function parseNumberFilter(value: string): number | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const num = Number(trimmed)
-  return Number.isFinite(num) ? num : null
-}
+type OvertimeFilter = "all" | "yes" | "no"
+type RhythmExternalFilter = "all" | "yes" | "no" | "not-available"
 
 type SalaryMarketLevel =
   | "below-median"
@@ -422,7 +479,26 @@ type SalaryMarketLevel =
   | "not-selected"
 
 type SurveyCategoryLevel = "top" | "middle" | "bottom"
-
+type FkrStatus = "included" | "not-included"
+type CriticalityLevel = "high" | "medium" | "low"
+type AssessmentGradeLevel = "A" | "B" | "C" | "D" | "E"
+type EmployeeCategoryLevel = "key" | "core" | "second-chance" | "ineffective" | "not-evaluated"
+type ResignationProbabilityLevel = "low" | "medium" | "high" | "not-evaluated"
+type TableViewMode = "full" | "short"
+type TeamMatrixMode = "survey-nine-box" | "manager-twelve-box"
+const TEAM_MATRIX_OPTIONS: Array<{
+  value: TeamMatrixMode
+  label: string
+}> = [
+  {
+    value: "survey-nine-box",
+    label: "9-box результаты опроса",
+  },
+  {
+    value: "manager-twelve-box",
+    label: "12-box результаты оценки руководителя",
+  },
+]
 const SALARY_MARKET_LEVEL_OPTIONS: Array<{
   value: SalaryMarketLevel
   label: string
@@ -462,81 +538,273 @@ const SALARY_MARKET_LEVEL_LABELS: Record<SalaryMarketLevel, string> = {
   "above-market-max": "Выше максимума рынка",
   "not-selected": "Не выбрано",
 }
+const FKR_STATUS_FILTER_OPTIONS: Array<{ value: FkrStatus; label: string }> = [
+  { value: "included", label: "входит" },
+  { value: "not-included", label: "не входит" },
+]
+const CRITICALITY_FILTER_OPTIONS: Array<{
+  value: AssessmentGradeLevel
+  label: string
+}> = [
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C", label: "C" },
+  { value: "D", label: "D" },
+  { value: "E", label: "E" },
+]
+const EMPLOYEE_CATEGORY_OPTIONS: Array<{
+  value: EmployeeCategoryLevel
+  label: string
+}> = [
+  { value: "not-evaluated", label: "Не оценен" },
+  { value: "key", label: "Ключевой" },
+  { value: "core", label: "Основной состав" },
+  { value: "second-chance", label: "Второй шанс" },
+  { value: "ineffective", label: "Неэффективный" },
+]
+const EMPLOYEE_CATEGORY_CLASSES: Record<EmployeeCategoryLevel, string> = {
+  "not-evaluated":
+    "bg-muted text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/80",
+  key: "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200",
+  core: "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200",
+  "second-chance": "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200",
+  ineffective: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200",
+}
+const RESIGNATION_PROBABILITY_OPTIONS: Array<{
+  value: ResignationProbabilityLevel
+  label: string
+}> = [
+  { value: "not-evaluated", label: "Не оценен" },
+  { value: "low", label: "Низкая" },
+  { value: "medium", label: "Средняя" },
+  { value: "high", label: "Высокая" },
+]
+const RESIGNATION_PROBABILITY_CLASSES: Record<ResignationProbabilityLevel, string> = {
+  "not-evaluated": "bg-muted text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/80",
+  low: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200",
+  medium: "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200",
+  high: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200",
+}
+const SURVEY_CATEGORY_LABELS: Record<SurveyCategoryLevel, string> = {
+  top: "TOP",
+  middle: "MIDDLE",
+  bottom: "BOTTOM",
+}
+
+const SURVEY_CATEGORY_OPTIONS: Array<{
+  value: SurveyCategoryLevel
+  label: string
+}> = [
+  { value: "top", label: SURVEY_CATEGORY_LABELS.top },
+  { value: "middle", label: SURVEY_CATEGORY_LABELS.middle },
+  { value: "bottom", label: SURVEY_CATEGORY_LABELS.bottom },
+]
+const OVERTIME_FILTER_OPTIONS: Array<{ value: OvertimeFilter; label: string }> = [
+  { value: "all", label: "Все" },
+  { value: "yes", label: "ДА" },
+  { value: "no", label: "НЕТ" },
+]
+const RHYTHM_FILTER_OPTIONS: Array<{ value: RhythmExternalFilter; label: string }> = [
+  { value: "all", label: "Все" },
+  { value: "yes", label: "ДА" },
+  { value: "no", label: "НЕТ" },
+  { value: "not-available", label: "Не оценено" },
+]
+const EXTERNAL_FILTER_OPTIONS = RHYTHM_FILTER_OPTIONS
 
 const SURVEY_CATEGORY_CLASSES: Record<SurveyCategoryLevel, string> = {
   top: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200 hover:bg-emerald-200/80 dark:hover:bg-emerald-900/70",
   middle: "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 hover:bg-amber-200/80 dark:hover:bg-amber-900/70",
   bottom: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200 hover:bg-red-200/80 dark:hover:bg-red-900/70",
 }
+const FKR_STATUS_CLASSES: Record<FkrStatus, string> = {
+  included: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200",
+  "not-included": "bg-muted text-muted-foreground",
+}
+const FKR_STATUS_LABELS: Record<FkrStatus, string> = {
+  included: "входит",
+  "not-included": "не входит",
+}
+const CRITICALITY_LEVEL_CLASSES: Record<AssessmentGradeLevel, string> = {
+  A: "border-emerald-500 bg-emerald-300 text-emerald-900 dark:border-emerald-400 dark:bg-emerald-950/80 dark:text-emerald-100",
+  B: "border-emerald-400 bg-emerald-200 text-emerald-900 dark:border-emerald-500/80 dark:bg-emerald-900/60 dark:text-emerald-200",
+  C: "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-800/80 dark:bg-emerald-950/50 dark:text-emerald-300",
+  D: "border-zinc-300 bg-zinc-200 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-300",
+  E: "border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-600/80 dark:bg-zinc-900/80 dark:text-zinc-400",
+}
+const CRITICALITY_LEVEL_LABELS: Record<AssessmentGradeLevel, string> = {
+  A: "A",
+  B: "B",
+  C: "C",
+  D: "D",
+  E: "E",
+}
+const TABLE_TAG_TEXT_CLASS = "text-xs font-normal"
 
-const ASSESSMENT_YEAR = new Date().getFullYear()
-const PREVIOUS_ASSESSMENT_YEAR = ASSESSMENT_YEAR - 1
-const ASSESSMENT_PROCEDURE_LABELS = [
-  "Оценочная процедура 1",
-  "Оценочная процедура 2",
-] as const
-
-function getAssessmentProcedureScore(
-  baseScore: number,
-  yearShift: 0 | 1,
-  procedureIndex: 0 | 1
-): number {
-  return (((baseScore - 1 + yearShift + procedureIndex) % 5) + 1)
+function DetailSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border bg-muted/35 px-4 py-3">
+        <span className="h-4 w-1 rounded-full bg-primary/60" />
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
+  )
 }
 
-function AssessmentTooltipContent({
-  baseScore,
-  title,
+function DetailItem({
+  label,
+  value,
+  insight,
 }: {
-  baseScore: number
-  title: string
+  label: string
+  value: ReactNode
+  insight?: ReactNode
 }) {
-  const currentYearProcedure1 = getAssessmentProcedureScore(baseScore, 0, 0)
-  const currentYearProcedure2 = getAssessmentProcedureScore(baseScore, 0, 1)
-  const previousYearProcedure1 = getAssessmentProcedureScore(baseScore, 1, 0)
-  const previousYearProcedure2 = getAssessmentProcedureScore(baseScore, 1, 1)
+  const content = (
+    <div
+      className="min-w-0 cursor-help rounded-lg border border-border/70 bg-muted/20 px-3 py-2 transition-colors hover:border-primary/40 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      tabIndex={0}
+    >
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 min-w-0 break-words text-sm leading-snug text-foreground">
+        {value}
+      </dd>
+    </div>
+  )
+
+  if (!insight) return content
 
   return (
-    <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
-      <div className="flex flex-col gap-1.5">
-        <div className="font-semibold text-foreground">{title}</div>
-        <div className="flex flex-col gap-1 border-t border-border pt-1">
-          <div className="font-semibold text-foreground">
-            Оценки за текущий и предыдущий календарный год
-          </div>
-          <div className="mt-0.5 flex flex-col gap-1">
-            <div className="font-medium text-foreground">
-              {ASSESSMENT_YEAR}
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[0]}</span>
-              <span className="font-semibold tabular-nums text-foreground">{currentYearProcedure1}</span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[1]}</span>
-              <span className="font-semibold tabular-nums text-foreground">{currentYearProcedure2}</span>
-            </div>
-          </div>
-          <div className="mt-0.5 flex flex-col gap-1">
-            <div className="font-medium text-foreground">
-              {PREVIOUS_ASSESSMENT_YEAR}
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[0]}</span>
-              <span className="font-semibold tabular-nums text-foreground">
-                {previousYearProcedure1}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">{ASSESSMENT_PROCEDURE_LABELS[1]}</span>
-              <span className="font-semibold tabular-nums text-foreground">
-                {previousYearProcedure2}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </TooltipContent>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {content}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
+        {insight}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function DetailTag({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className: string
+}) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} ${className}`}>
+      {children}
+    </span>
+  )
+}
+
+function CriticalityTag({ level }: { level: AssessmentGradeLevel }) {
+  return (
+    <span
+      className={`inline-flex min-h-7 items-center rounded-full border px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${CRITICALITY_LEVEL_CLASSES[level]}`}
+    >
+      {CRITICALITY_LEVEL_LABELS[level]}
+    </span>
+  )
+}
+
+const ASSESSMENT_CATEGORY_SCORE: Record<EmployeeCategoryLevel, number> = {
+  ineffective: 1,
+  "second-chance": 2,
+  core: 3,
+  key: 4,
+  "not-evaluated": 0,
+}
+const ASSESSMENT_PROBABILITY_SCORE: Record<ResignationProbabilityLevel, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  "not-evaluated": 0,
+}
+
+function getAssessmentGrade(
+  category: EmployeeCategoryLevel,
+  probability: ResignationProbabilityLevel
+): AssessmentGradeLevel {
+  if (category === "not-evaluated" || probability === "not-evaluated") {
+    return "E"
+  }
+
+  if (category === "second-chance") {
+    return "D"
+  }
+  if (category === "ineffective") {
+    return "E"
+  }
+
+  const score = ASSESSMENT_CATEGORY_SCORE[category] + ASSESSMENT_PROBABILITY_SCORE[probability]
+
+  if (score >= 7) return "A"
+  if (score >= 6) return "B"
+  if (score >= 5) return "C"
+  if (score >= 4) return "D"
+  return "E"
+}
+
+function hasRequiredAssessment(category: EmployeeCategoryLevel, probability: ResignationProbabilityLevel): {
+  isFormed: boolean
+  missingFields: string[]
+} {
+  if (category !== "not-evaluated" && probability !== "not-evaluated") {
+    return { isFormed: true, missingFields: [] }
+  }
+
+  const missingFields = []
+  if (category === "not-evaluated") {
+    missingFields.push("Категория сотрудника")
+  }
+  if (probability === "not-evaluated") {
+    missingFields.push("Вероятность увольнения")
+  }
+
+  return { isFormed: false, missingFields }
+}
+
+function getAssessmentGradeForMember(
+  member: StaffMember,
+  salaryOverrides: Record<string, SalaryMarketLevel>,
+  categoryOverrides: Record<string, EmployeeCategoryLevel>,
+  probabilityOverrides: Record<string, ResignationProbabilityLevel>
+): AssessmentGradeLevel {
+  const salaryLevel = getEffectiveSalaryMarketLevel(member, salaryOverrides)
+  const category = categoryOverrides[member.id] ?? getEmployeeCategory(member, salaryLevel)
+  const probability =
+    probabilityOverrides[member.id] ?? getResignationProbability(member, salaryLevel)
+  return getAssessmentGrade(category, probability)
+}
+
+function getCriticalityRank(
+  member: StaffMember,
+  salaryOverrides: Record<string, SalaryMarketLevel>,
+  categoryOverrides: Record<string, EmployeeCategoryLevel>,
+  probabilityOverrides: Record<string, ResignationProbabilityLevel>
+): number {
+  const grade = getAssessmentGradeForMember(member, salaryOverrides, categoryOverrides, probabilityOverrides)
+  return (
+    {
+      A: 0,
+      B: 1,
+      C: 2,
+      D: 3,
+      E: 4,
+    }[grade] ?? 4
   )
 }
 
@@ -547,14 +815,167 @@ function formatMinutesToHourMinute(totalMinutes?: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
 }
 
-function makeNineBoxBuckets(staff: StaffMember[]): StaffMember[][] {
-  const buckets: StaffMember[][] = Array.from({ length: 9 }, () => [])
-  staff.forEach((member, index) => {
-    const value = `${member.id}|${member.lastName}|${member.firstName}|${member.patronymic}|${index}`
-    const hash = stableNumber(value)
-    const x = hash % 3
-    const y = Math.floor((hash / 3) % 3)
-    const indexBox = y * 3 + x
+function getEffectiveSalaryMarketLevel(
+  member: StaffMember,
+  overrides: Record<string, SalaryMarketLevel>
+): SalaryMarketLevel {
+  return overrides[member.id] ?? member.salaryMarketLevel ?? "not-selected"
+}
+
+function hasOvertime(member: StaffMember): boolean {
+  return (member.overtimeHoursLastMonth ?? 0) > 0
+}
+
+function isNegativeAssessment(value?: number): boolean {
+  return value !== undefined && value < 4
+}
+
+function getRiskReasons(member: StaffMember, salaryLevel: SalaryMarketLevel): string[] {
+  const reasons: string[] = []
+  if (salaryLevel === "below-median") reasons.push("З/П ниже рынка")
+  if (hasOvertime(member)) reasons.push("Есть переработки")
+  if (member.surveyResultCategory === "bottom")
+    reasons.push(`Опрос: результат ${SURVEY_CATEGORY_LABELS.bottom}`)
+  if (member.surveyInteractionCategory === "bottom")
+    reasons.push(`Опрос: команда ${SURVEY_CATEGORY_LABELS.bottom}`)
+  if (isNegativeAssessment(member.rhythmAssessmentResult)) reasons.push("РИТМ ниже 4")
+  if (isNegativeAssessment(member.externalAssessmentResult)) reasons.push("Внешняя оценка ниже 4")
+  if ((member.unusedVacationDays ?? 0) >= 30) reasons.push("Много неисп. отпуска")
+  if (reasons.length === 0) reasons.push("Критичных отклонений нет")
+  return reasons
+}
+
+function getRetentionRiskScore(member: StaffMember, salaryLevel: SalaryMarketLevel): number {
+  return (
+    (salaryLevel === "below-median" ? 2 : 0) +
+    (hasOvertime(member) ? 1 : 0) +
+    (member.surveyResultCategory === "bottom" ? 1 : 0) +
+    (member.surveyInteractionCategory === "bottom" ? 1 : 0) +
+    (isNegativeAssessment(member.rhythmAssessmentResult) ? 1 : 0) +
+    (isNegativeAssessment(member.externalAssessmentResult) ? 1 : 0) +
+    ((member.unusedVacationDays ?? 0) >= 30 ? 1 : 0)
+  )
+}
+
+function getSystemRecommendation(member: StaffMember, salaryLevel: SalaryMarketLevel): string {
+  const riskScore = getRetentionRiskScore(member, salaryLevel)
+
+  if (riskScore >= 4) return "Сформировать план корректировки"
+  if (riskScore >= 3) return "Провести 1:1 и retention action"
+  if (salaryLevel === "below-median") return "Проверить компенсацию"
+  if (hasOvertime(member)) return "Проверить нагрузку"
+  if (hasNegativeSignals(member)) return "Обсудить развитие"
+  return "Наблюдать"
+}
+
+function getEmployeeCategory(
+  member: StaffMember,
+  _salaryLevel: SalaryMarketLevel
+): EmployeeCategoryLevel {
+  return member.managerEmployeeCategory ?? "not-evaluated"
+}
+
+function getResignationProbability(
+  member: StaffMember,
+  _salaryLevel: SalaryMarketLevel
+): ResignationProbabilityLevel {
+  return member.managerResignationProbability ?? "not-evaluated"
+}
+
+const EMPLOYEE_CATEGORY_TO_INDEX: Record<EmployeeCategoryLevel, number> = {
+  ineffective: 0,
+  "second-chance": 1,
+  core: 2,
+  key: 3,
+  "not-evaluated": 2,
+}
+
+const RESIGNATION_PROBABILITY_TO_INDEX: Record<ResignationProbabilityLevel, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+  "not-evaluated": 1,
+}
+
+function getManagerTwelveBoxCategoryIndex(member: StaffMember, salaryLevel: SalaryMarketLevel, overrides: Record<string, EmployeeCategoryLevel>): number {
+  return EMPLOYEE_CATEGORY_TO_INDEX[
+    overrides[member.id] ?? getEmployeeCategory(member, salaryLevel)
+  ]
+}
+
+function getManagerTwelveBoxResignationIndex(
+  member: StaffMember,
+  salaryLevel: SalaryMarketLevel,
+  overrides: Record<string, ResignationProbabilityLevel>
+): number {
+  return RESIGNATION_PROBABILITY_TO_INDEX[
+    overrides[member.id] ?? getResignationProbability(member, salaryLevel)
+  ]
+}
+
+function isFullyAssessedForManagerMatrix(
+  member: StaffMember,
+  salaryLevel: SalaryMarketLevel,
+  employeeCategoryOverrides: Record<string, EmployeeCategoryLevel>,
+  resignationProbabilityOverrides: Record<string, ResignationProbabilityLevel>
+): boolean {
+  const category = employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, salaryLevel)
+  const probability =
+    resignationProbabilityOverrides[member.id] ?? getResignationProbability(member, salaryLevel)
+
+  return category !== "not-evaluated" && probability !== "not-evaluated"
+}
+
+function hasNegativeSignals(member: StaffMember): boolean {
+  const surveyResult = member.surveyResultCategory ?? "middle"
+  const surveyTeam = member.surveyInteractionCategory ?? "middle"
+  return (
+    surveyResult === "bottom" ||
+    surveyTeam === "bottom" ||
+    isNegativeAssessment(member.rhythmAssessmentResult) ||
+    isNegativeAssessment(member.externalAssessmentResult)
+  )
+}
+
+function makeNineBoxBuckets(
+  staff: StaffMember[],
+  matrixMode: TeamMatrixMode,
+  salaryMarketOverrides: Record<string, SalaryMarketLevel>,
+  employeeCategoryOverrides: Record<string, EmployeeCategoryLevel>,
+  resignationProbabilityOverrides: Record<string, ResignationProbabilityLevel>
+): StaffMember[][] {
+  const colCount = matrixMode === "survey-nine-box" ? 3 : 4
+  const rowCount = 3
+  const buckets: StaffMember[][] = Array.from({ length: colCount * rowCount }, () => [])
+  staff.forEach((member) => {
+    const effectiveSalaryLevel = getEffectiveSalaryMarketLevel(member, salaryMarketOverrides)
+
+  if (matrixMode === "survey-nine-box") {
+      const x = SURVEY_NINE_BOX_X_LEVEL_TO_INDEX[member.surveyResultCategory ?? "middle"]
+      const y = SURVEY_NINE_BOX_Y_LEVEL_TO_INDEX[member.surveyInteractionCategory ?? "middle"]
+      const bucketIndex = (rowCount - 1 - y) * colCount + x
+      buckets[bucketIndex].push(member)
+      return
+    }
+
+    if (
+      !isFullyAssessedForManagerMatrix(
+        member,
+        effectiveSalaryLevel,
+        employeeCategoryOverrides,
+        resignationProbabilityOverrides
+      )
+    ) {
+      return
+    }
+
+    const x = getManagerTwelveBoxCategoryIndex(member, effectiveSalaryLevel, employeeCategoryOverrides)
+    const y = getManagerTwelveBoxResignationIndex(
+      member,
+      effectiveSalaryLevel,
+      resignationProbabilityOverrides
+    )
+    const indexBox = y * colCount + x
     buckets[indexBox].push(member)
   })
   return buckets
@@ -579,26 +1000,44 @@ export default function AssessmentPage() {
   const [selectedPositionIds, setSelectedPositionIds] = useState<string[]>([])
   const [positionSearchQuery, setPositionSearchQuery] = useState("")
   const [unitSearchQuery, setUnitSearchQuery] = useState("")
-  const [bankTenureFrom, setBankTenureFrom] = useState("")
-  const [bankTenureTo, setBankTenureTo] = useState("")
-  const [blockTenureFrom, setBlockTenureFrom] = useState("")
-  const [blockTenureTo, setBlockTenureTo] = useState("")
-  const [ageFrom, setAgeFrom] = useState("")
-  const [ageTo, setAgeTo] = useState("")
-  const [vacationDaysFrom, setVacationDaysFrom] = useState("")
-  const [vacationDaysTo, setVacationDaysTo] = useState("")
+  const [criticalityFilters, setCriticalityFilters] = useState<AssessmentGradeLevel[]>([])
+  const [salaryMarketFilters, setSalaryMarketFilters] = useState<SalaryMarketLevel[]>([])
+  const [fkrStatusFilters, setFkrStatusFilters] = useState<FkrStatus[]>([])
+  const [overtimeFilter, setOvertimeFilter] = useState<OvertimeFilter>("all")
+  const [rhythmAssessmentFilter, setRhythmAssessmentFilter] = useState<RhythmExternalFilter>("all")
+  const [externalAssessmentFilter, setExternalAssessmentFilter] = useState<RhythmExternalFilter>("all")
+  const [surveyResultFilters, setSurveyResultFilters] = useState<SurveyCategoryLevel[]>([])
+  const [surveyInteractionFilters, setSurveyInteractionFilters] = useState<SurveyCategoryLevel[]>([])
   const unitOptions = useMemo(() => collectUnitOptions(ORG_ROOT), [])
   const [staffPage, setStaffPage] = useState(1)
   const [staffPageSize, setStaffPageSize] = useState<number>(
     STAFF_TABLE_PAGE_SIZE_OPTIONS[0]
   )
+  const [tableViewMode, setTableViewMode] = useState<TableViewMode>("full")
+  const [teamMatrixMode, setTeamMatrixMode] = useState<TeamMatrixMode>("survey-nine-box")
+  const [isTeamMatrixMenuOpen, setIsTeamMatrixMenuOpen] = useState(false)
   const [isNineBoxOpen, setIsNineBoxOpen] = useState(false)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [selectedStaffMember, setSelectedStaffMember] = useState<StaffMember | null>(
+    null
+  )
   const [nineBoxCellDetail, setNineBoxCellDetail] = useState<NineBoxCellDetail | null>(
     null
   )
+  const [isNotebookOpen, setIsNotebookOpen] = useState(false)
+  const [notebookStaffId, setNotebookStaffId] = useState<string | null>(null)
+  const [notebookDraft, setNotebookDraft] = useState("")
+  const [staffNotebookEntries, setStaffNotebookEntries] = useState<Record<string, StaffNotebookEntry[]>>(
+    {}
+  )
   const [salaryMarketLevelOverrides, setSalaryMarketLevelOverrides] = useState<
     Record<string, SalaryMarketLevel>
+  >({})
+  const [employeeCategoryOverrides, setEmployeeCategoryOverrides] = useState<
+    Record<string, EmployeeCategoryLevel>
+  >({})
+  const [resignationProbabilityOverrides, setResignationProbabilityOverrides] = useState<
+    Record<string, ResignationProbabilityLevel>
   >({})
 
   const staffInUnit = useMemo(() => {
@@ -611,21 +1050,11 @@ export default function AssessmentPage() {
     const globalQuery = staffSearchQuery.trim().toLowerCase()
     const fioQuery = fioFilterQuery.trim().toLowerCase()
     const selectedPositions = new Set(selectedPositionIds)
-    const parsedBankTenureFrom = parseNumberFilter(bankTenureFrom)
-    const parsedBankTenureTo = parseNumberFilter(bankTenureTo)
-    const parsedBlockTenureFrom = parseNumberFilter(blockTenureFrom)
-    const parsedBlockTenureTo = parseNumberFilter(blockTenureTo)
-    const parsedAgeFrom = parseNumberFilter(ageFrom)
-    const parsedAgeTo = parseNumberFilter(ageTo)
-    const parsedVacationFrom = parseNumberFilter(vacationDaysFrom)
-                          const parsedVacationTo = parseNumberFilter(vacationDaysTo)
-    const isInRange = (value: number | null, min: number | null, max: number | null) => {
-      if (min === null && max === null) return true
-      if (value === null) return false
-      if (min !== null && value < min) return false
-      if (max !== null && value > max) return false
-      return true
-    }
+    const selectedCriticality = new Set(criticalityFilters)
+    const selectedSalaryFilters = new Set(salaryMarketFilters)
+    const selectedFkrFilters = new Set(fkrStatusFilters)
+    const selectedSurveyResultFilters = new Set(surveyResultFilters)
+    const selectedSurveyInteractionFilters = new Set(surveyInteractionFilters)
 
     return staffInUnit.filter((member) => {
       const unitPath = getBreadcrumb(ORG_ROOT, member.unitId)
@@ -641,18 +1070,43 @@ export default function AssessmentPage() {
         .join(" ")
         .toLowerCase()
 
+      const currentSalaryMarketLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
+      const currentCriticality: AssessmentGradeLevel = getAssessmentGradeForMember(
+        member,
+        salaryMarketLevelOverrides,
+        employeeCategoryOverrides,
+        resignationProbabilityOverrides
+      )
+      const currentFkrStatus: FkrStatus = member.fkrStatus ?? "not-included"
+      const currentSurveyResultCategory: SurveyCategoryLevel = member.surveyResultCategory ?? "middle"
+      const currentSurveyInteractionCategory: SurveyCategoryLevel = member.surveyInteractionCategory ?? "middle"
+      const currentOvertime: OvertimeFilter = hasOvertime(member) ? "yes" : "no"
+      const currentRhythmSignal: RhythmExternalFilter =
+        member.rhythmAssessmentResult === undefined
+          ? "not-available"
+          : member.rhythmAssessmentResult >= 4
+            ? "yes"
+            : "no"
+      const currentExternalSignal: RhythmExternalFilter =
+        member.externalAssessmentResult === undefined
+          ? "not-available"
+          : member.externalAssessmentResult >= 4
+            ? "yes"
+            : "no"
+
       return (
         (!globalQuery || searchText.includes(globalQuery)) &&
         (!fioQuery || fio.toLowerCase().includes(fioQuery)) &&
         (selectedPositionIds.length === 0 || selectedPositions.has(member.position)) &&
-        isInRange(parseTenureMonths(member.bankTenure), parsedBankTenureFrom, parsedBankTenureTo) &&
-        isInRange(
-          parseTenureMonths(member.blockTenure),
-          parsedBlockTenureFrom,
-          parsedBlockTenureTo
-        ) &&
-        isInRange(member.age ?? null, parsedAgeFrom, parsedAgeTo) &&
-        isInRange(member.unusedVacationDays ?? null, parsedVacationFrom, parsedVacationTo)
+        (selectedCriticality.size === 0 || selectedCriticality.has(currentCriticality)) &&
+        (selectedSalaryFilters.size === 0 || selectedSalaryFilters.has(currentSalaryMarketLevel)) &&
+        (selectedFkrFilters.size === 0 || selectedFkrFilters.has(currentFkrStatus)) &&
+        (overtimeFilter === "all" || overtimeFilter === currentOvertime) &&
+        (rhythmAssessmentFilter === "all" || rhythmAssessmentFilter === currentRhythmSignal) &&
+        (externalAssessmentFilter === "all" || externalAssessmentFilter === currentExternalSignal) &&
+        (selectedSurveyResultFilters.size === 0 || selectedSurveyResultFilters.has(currentSurveyResultCategory)) &&
+        (selectedSurveyInteractionFilters.size === 0 ||
+          selectedSurveyInteractionFilters.has(currentSurveyInteractionCategory))
       )
     })
   }, [
@@ -660,39 +1114,72 @@ export default function AssessmentPage() {
     selectedPositionIds,
     staffInUnit,
     staffSearchQuery,
-    bankTenureFrom,
-    bankTenureTo,
-    blockTenureFrom,
-    blockTenureTo,
-    ageFrom,
-    ageTo,
-    vacationDaysFrom,
-    vacationDaysTo,
+    criticalityFilters,
+    salaryMarketFilters,
+    fkrStatusFilters,
+    overtimeFilter,
+    rhythmAssessmentFilter,
+    externalAssessmentFilter,
+    surveyResultFilters,
+    surveyInteractionFilters,
+    salaryMarketLevelOverrides,
+    employeeCategoryOverrides,
+    resignationProbabilityOverrides,
   ])
 
+  const sortedStaff = useMemo(() => {
+    return [...filteredStaff].sort((a, b) => {
+      const criticalityDelta =
+        getCriticalityRank(
+          a,
+          salaryMarketLevelOverrides,
+          employeeCategoryOverrides,
+          resignationProbabilityOverrides
+        ) -
+        getCriticalityRank(
+          b,
+          salaryMarketLevelOverrides,
+          employeeCategoryOverrides,
+          resignationProbabilityOverrides
+        )
+      if (criticalityDelta !== 0) return criticalityDelta
+
+      const aSalary = getEffectiveSalaryMarketLevel(a, salaryMarketLevelOverrides)
+      const bSalary = getEffectiveSalaryMarketLevel(b, salaryMarketLevelOverrides)
+      const riskDelta =
+        getRiskReasons(b, bSalary).length - getRiskReasons(a, aSalary).length
+      if (riskDelta !== 0) return riskDelta
+
+      return formatFio(a.lastName, a.firstName, a.patronymic).localeCompare(
+        formatFio(b.lastName, b.firstName, b.patronymic)
+      )
+    })
+  }, [
+    filteredStaff,
+    salaryMarketLevelOverrides,
+    employeeCategoryOverrides,
+    resignationProbabilityOverrides,
+  ])
   const totalStaffItems = filteredStaff.length
   const staffPages = Math.max(1, Math.ceil(totalStaffItems / staffPageSize))
   const safeStaffPage = Math.min(staffPage, staffPages)
   const pagedStaff = useMemo(() => {
     const start = (safeStaffPage - 1) * staffPageSize
-    return filteredStaff.slice(start, start + staffPageSize)
-  }, [filteredStaff, safeStaffPage, staffPageSize])
+    return sortedStaff.slice(start, start + staffPageSize)
+  }, [safeStaffPage, sortedStaff, staffPageSize])
   const currentUnitLabel = getSelectedUnitsLabel(selectedUnitIds, unitOptions)
   const activeFiltersCount =
     selectedUnitIds.length +
     (fioFilterQuery.trim() ? 1 : 0) +
     selectedPositionIds.length +
-    (bankTenureFrom.trim() ? 1 : 0) +
-    (bankTenureTo.trim() ? 1 : 0) +
-    (blockTenureFrom.trim() ? 1 : 0) +
-    (blockTenureTo.trim() ? 1 : 0) +
-    (ageFrom.trim() ? 1 : 0) +
-    (ageTo.trim() ? 1 : 0) +
-    (vacationDaysFrom.trim() ? 1 : 0) +
-    (vacationDaysTo.trim() ? 1 : 0)
-  const hasBankTenureInterval =
-    Boolean(bankTenureFrom.trim()) || Boolean(bankTenureTo.trim())
-  const bankTenureIntervalLabel = `${bankTenureFrom.trim() || "0"} - ${bankTenureTo.trim() || "40"}`
+    criticalityFilters.length +
+    salaryMarketFilters.length +
+    fkrStatusFilters.length +
+    (overtimeFilter === "all" ? 0 : 1) +
+    (rhythmAssessmentFilter === "all" ? 0 : 1) +
+    (externalAssessmentFilter === "all" ? 0 : 1) +
+    surveyResultFilters.length +
+    surveyInteractionFilters.length
   const uniquePositionOptions = useMemo(() => {
     const values = new Set(STAFF.map((member) => member.position))
     return [...values].sort((a, b) => a.localeCompare(b))
@@ -709,12 +1196,289 @@ export default function AssessmentPage() {
       label: unitPathById.get(unitId) || unitId,
     }))
   }, [selectedUnitIds, unitOptions])
+  const selectedStaffUnitPath = selectedStaffMember
+    ? getBreadcrumb(ORG_ROOT, selectedStaffMember.unitId)
+      .filter((unit) => unit.id !== ORG_ROOT.id)
+      .map((unit) => unit.name)
+      .join(" / ")
+    : ""
+  const selectedStaffSalaryMarketLevel: SalaryMarketLevel = selectedStaffMember
+    ? salaryMarketLevelOverrides[selectedStaffMember.id] ??
+      selectedStaffMember.salaryMarketLevel ??
+      "not-selected"
+    : "not-selected"
+  const selectedStaffFkrStatus: FkrStatus =
+    selectedStaffMember?.fkrStatus ?? "not-included"
+  const selectedStaffCriticality: AssessmentGradeLevel = selectedStaffMember
+    ? getAssessmentGradeForMember(
+        selectedStaffMember,
+        salaryMarketLevelOverrides,
+        employeeCategoryOverrides,
+        resignationProbabilityOverrides
+      )
+    : "E"
+  const selectedStaffSurveyResult =
+    selectedStaffMember?.surveyResultCategory ?? "middle"
+  const selectedStaffSurveyTeam =
+    selectedStaffMember?.surveyInteractionCategory ?? "middle"
+  const notebookStaffMember = notebookStaffId ? STAFF.find((member) => member.id === notebookStaffId) : null
+  const notebookEntries = notebookStaffMember
+    ? staffNotebookEntries[notebookStaffId] ?? []
+    : []
+  const openStaffNotebook = (member: StaffMember) => {
+    setNotebookStaffId(member.id)
+    setNotebookDraft("")
+    setIsNotebookOpen(true)
+  }
+  const closeStaffNotebook = () => {
+    setIsNotebookOpen(false)
+    setNotebookStaffId(null)
+    setNotebookDraft("")
+  }
+  const saveStaffNotebookEntry = () => {
+    const text = notebookDraft.trim()
+    if (!text || !notebookStaffId || !notebookStaffMember) return
+
+    setStaffNotebookEntries((prev) => ({
+      ...prev,
+      [notebookStaffId]: [
+        ...(prev[notebookStaffId] ?? []),
+        {
+          createdAt: formatNotebookDateTime(),
+          subjectFio: formatFio(
+            notebookStaffMember.lastName,
+            notebookStaffMember.firstName,
+            notebookStaffMember.patronymic
+          ),
+          text,
+        },
+      ],
+    }))
+    setNotebookDraft("")
+  }
   const filteredUnitOptions = useMemo(() => {
     const query = unitSearchQuery.trim().toLowerCase()
     if (!query) return unitOptions
     return unitOptions.filter((unit) => unit.path.toLowerCase().includes(query))
   }, [unitOptions, unitSearchQuery])
-  const nineBoxBuckets = useMemo(() => makeNineBoxBuckets(filteredStaff), [filteredStaff])
+  const teamMatrixConfig = TEAM_MATRIX_AXIS_LABELS[teamMatrixMode]
+  const teamMatrixColumnCount = teamMatrixConfig.x.length
+  const teamMatrixRowCount = teamMatrixConfig.y.length
+  const isManagerTwelveBox = teamMatrixMode === "manager-twelve-box"
+  const teamMatrixRows = useMemo(
+    () => getMatrixCellRows(teamMatrixColumnCount, teamMatrixRowCount, isManagerTwelveBox),
+    [teamMatrixColumnCount, teamMatrixRowCount, isManagerTwelveBox]
+  )
+  const nineBoxBuckets = useMemo(
+    () =>
+      makeNineBoxBuckets(
+        filteredStaff,
+        teamMatrixMode,
+        salaryMarketLevelOverrides,
+        employeeCategoryOverrides,
+        resignationProbabilityOverrides
+      ),
+    [
+      filteredStaff,
+      teamMatrixMode,
+      salaryMarketLevelOverrides,
+      employeeCategoryOverrides,
+      resignationProbabilityOverrides,
+    ]
+  )
+  const teamMatrixEmployeeStats = useMemo(() => {
+    const totalInSelection = filteredStaff.length
+
+    if (teamMatrixMode === "manager-twelve-box") {
+      const evaluatedMembers: StaffMember[] = []
+      const notEvaluatedMembers: StaffMember[] = []
+
+      filteredStaff.forEach((member) => {
+        const salaryLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
+        const isAssessed = isFullyAssessedForManagerMatrix(
+          member,
+          salaryLevel,
+          employeeCategoryOverrides,
+          resignationProbabilityOverrides
+        )
+
+        if (isAssessed) {
+          evaluatedMembers.push(member)
+        } else {
+          notEvaluatedMembers.push(member)
+        }
+      })
+
+      return {
+        totalInMatrix: totalInSelection,
+        evaluatedByBoth: evaluatedMembers.length,
+        notEvaluated: notEvaluatedMembers.length,
+        evaluatedMembers,
+        notEvaluatedMembers,
+      }
+    }
+
+    return {
+      totalInMatrix: totalInSelection,
+      evaluatedByBoth: totalInSelection,
+      notEvaluated: 0,
+      evaluatedMembers: [],
+      notEvaluatedMembers: [],
+    }
+  }, [
+    teamMatrixMode,
+    filteredStaff,
+    salaryMarketLevelOverrides,
+    employeeCategoryOverrides,
+    resignationProbabilityOverrides,
+  ])
+  const resetFiltersForMatrix = () => {
+    setNineBoxCellDetail(null)
+    setStaffPage(1)
+  }
+
+  const clearMatrixUnitFilter = (unitId: string) => {
+    setSelectedUnitIds((prev) => prev.filter((id) => id !== unitId))
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixFioFilter = () => {
+    setFioFilterQuery("")
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixPositionFilter = (position: string) => {
+    setSelectedPositionIds((prev) => prev.filter((item) => item !== position))
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixSalaryFilter = (value: SalaryMarketLevel) => {
+    setSalaryMarketFilters((prev) => prev.filter((item) => item !== value))
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixFkrFilter = (value: FkrStatus) => {
+    setFkrStatusFilters((prev) => prev.filter((item) => item !== value))
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixOvertimeFilters = () => {
+    setOvertimeFilter("all")
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixRhythmFilter = () => {
+    setRhythmAssessmentFilter("all")
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixExternalFilter = () => {
+    setExternalAssessmentFilter("all")
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixSurveyResultFilter = (value: SurveyCategoryLevel) => {
+    setSurveyResultFilters((prev) => prev.filter((item) => item !== value))
+    resetFiltersForMatrix()
+  }
+
+  const clearMatrixSurveyInteractionFilter = (value: SurveyCategoryLevel) => {
+    setSurveyInteractionFilters((prev) => prev.filter((item) => item !== value))
+    resetFiltersForMatrix()
+  }
+
+  const teamMatrixFilterTags = useMemo(
+    () => [
+      ...selectedUnitTags.map((unit) => ({
+        id: `unit-${unit.id}`,
+        label: `Подразделение: ${unit.label}`,
+        onClear: () => clearMatrixUnitFilter(unit.id),
+      })),
+      ...selectedPositionIds.map((position) => ({
+        id: `position-${position}`,
+        label: `Должность: ${position}`,
+        onClear: () => clearMatrixPositionFilter(position),
+      })),
+      ...(fioFilterQuery.trim()
+        ? [
+            {
+              id: "fio",
+              label: `ФИО: ${fioFilterQuery.trim()}`,
+              onClear: clearMatrixFioFilter,
+            },
+          ]
+        : []),
+      ...criticalityFilters.map((item) => ({
+        id: `criticality-${item}`,
+        label: `Результат оценки: ${CRITICALITY_LEVEL_LABELS[item]}`,
+        onClear: undefined,
+      })),
+      ...salaryMarketFilters.map((item) => ({
+        id: `salary-${item}`,
+        label: `З/П к рынку: ${SALARY_MARKET_LEVEL_LABELS[item]}`,
+        onClear: () => clearMatrixSalaryFilter(item),
+      })),
+      ...fkrStatusFilters.map((item) => ({
+        id: `fkr-${item}`,
+        label: `ФКР: ${FKR_STATUS_LABELS[item]}`,
+        onClear: () => clearMatrixFkrFilter(item),
+      })),
+      ...(overtimeFilter !== "all"
+        ? [
+            {
+              id: "overtime",
+              label: `Переработки: ${overtimeFilter === "yes" ? "ДА" : "НЕТ"}`,
+              onClear: clearMatrixOvertimeFilters,
+            },
+          ]
+        : []),
+      ...(rhythmAssessmentFilter !== "all"
+        ? [
+            {
+              id: "rhythm",
+              label: `РИТМ: ${
+                RHYTHM_FILTER_OPTIONS.find((item) => item.value === rhythmAssessmentFilter)?.label ?? ""
+              }`,
+              onClear: clearMatrixRhythmFilter,
+            },
+          ]
+        : []),
+      ...(externalAssessmentFilter !== "all"
+        ? [
+            {
+              id: "external",
+              label: `Внешняя оценка: ${
+                EXTERNAL_FILTER_OPTIONS.find((item) => item.value === externalAssessmentFilter)?.label ?? ""
+              }`,
+              onClear: clearMatrixExternalFilter,
+            },
+          ]
+        : []),
+      ...surveyResultFilters.map((item) => ({
+        id: `survey-result-${item}`,
+        label: `Опрос: результат ${SURVEY_CATEGORY_LABELS[item]}`,
+        onClear: () => clearMatrixSurveyResultFilter(item),
+      })),
+      ...surveyInteractionFilters.map((item) => ({
+        id: `survey-team-${item}`,
+        label: `Опрос: команда ${SURVEY_CATEGORY_LABELS[item]}`,
+        onClear: () => clearMatrixSurveyInteractionFilter(item),
+      })),
+    ],
+    [
+      selectedUnitTags,
+      selectedPositionIds,
+      fioFilterQuery,
+      criticalityFilters,
+      salaryMarketFilters,
+      fkrStatusFilters,
+      overtimeFilter,
+      rhythmAssessmentFilter,
+      externalAssessmentFilter,
+      surveyResultFilters,
+      surveyInteractionFilters,
+    ]
+  )
 
   const toggleSelectedUnit = (unitId: string) => {
     setSelectedUnitIds((prev) =>
@@ -731,6 +1495,17 @@ export default function AssessmentPage() {
     setStaffPage(1)
     setNineBoxCellDetail(null)
   }
+  const toggleFilterValue = <T extends string,>(
+    value: T,
+    setCurrent: (value: (prev: T[]) => T[]) => void
+  ) => {
+    setCurrent((prev) => {
+      if (prev.includes(value)) return prev.filter((item) => item !== value)
+      return [...prev, value]
+    })
+    setStaffPage(1)
+    setNineBoxCellDetail(null)
+  }
 
   const resetSelectedUnits = () => {
     setSelectedUnitIds([])
@@ -742,15 +1517,18 @@ export default function AssessmentPage() {
     setFioFilterQuery("")
     setSelectedPositionIds([])
     setPositionSearchQuery("")
-    setBankTenureFrom("")
-    setBankTenureTo("")
-    setBlockTenureFrom("")
-    setBlockTenureTo("")
-    setAgeFrom("")
-    setAgeTo("")
-    setVacationDaysFrom("")
-    setVacationDaysTo("")
+    setUnitSearchQuery("")
+    setCriticalityFilters([])
+    setSalaryMarketFilters([])
+    setFkrStatusFilters([])
+    setOvertimeFilter("all")
+    setRhythmAssessmentFilter("all")
+    setExternalAssessmentFilter("all")
+    setSurveyResultFilters([])
+    setSurveyInteractionFilters([])
     resetSelectedUnits()
+    setStaffPage(1)
+    setNineBoxCellDetail(null)
   }
 
   const nineBoxRoleDetail = nineBoxCellDetail
@@ -759,6 +1537,10 @@ export default function AssessmentPage() {
   const nineBoxDetailStaff = nineBoxCellDetail
     ? nineBoxBuckets[nineBoxCellDetail.bucketIndex]
     : []
+  const isFullTableView = tableViewMode === "full"
+  const teamMatrixTitle =
+    TEAM_MATRIX_OPTIONS.find((option) => option.value === teamMatrixMode)?.label ??
+    "9-box результаты опроса"
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pt-4">
@@ -821,15 +1603,56 @@ export default function AssessmentPage() {
                   Фильтры
                   {activeFiltersCount > 0 ? ` (${activeFiltersCount})` : null}
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-10"
-                  onClick={() => setIsNineBoxOpen(true)}
-                >
-                  Открыть 9-box
-                </Button>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-10"
+                    onClick={() => setIsTeamMatrixMenuOpen((value) => !value)}
+                  >
+                    Матрица команды
+                    <ChevronDown className="size-4" />
+                  </Button>
+                  {isTeamMatrixMenuOpen ? (
+                    <div className="absolute right-0 top-full z-20 mt-1 w-80 rounded-md border border-border bg-popover p-1 shadow-lg">
+                      {TEAM_MATRIX_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className="w-full rounded-sm px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-muted"
+                          onClick={() => {
+                            setTeamMatrixMode(option.value)
+                            setIsNineBoxOpen(true)
+                            setIsTeamMatrixMenuOpen(false)
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="inline-flex h-10 rounded-md border border-border bg-muted p-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={tableViewMode === "short" ? "default" : "ghost"}
+                    className="h-8 px-3"
+                    onClick={() => setTableViewMode("short")}
+                  >
+                    Краткий
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={tableViewMode === "full" ? "default" : "ghost"}
+                    className="h-8 px-3"
+                    onClick={() => setTableViewMode("full")}
+                  >
+                    Полный
+                  </Button>
+                </div>
               </div>
             </div>
             {activeFiltersCount > 0 ? (
@@ -869,20 +1692,145 @@ export default function AssessmentPage() {
                     </button>
                   </span>
                 ) : null}
-                {hasBankTenureInterval ? (
+                {criticalityFilters.length > 0 ? (
                   <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
                     <span className="truncate">
-                      Стаж в Банке: {bankTenureIntervalLabel} лет
+                      Результат оценки: {criticalityFilters.map((item) => CRITICALITY_LEVEL_LABELS[item]).join(", ")}
                     </span>
                     <button
                       type="button"
                       className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
-                      aria-label="Очистить фильтр по стажу в банке"
+                      aria-label="Очистить фильтр по результату оценки"
                       onClick={() => {
-                        setBankTenureFrom("")
-                        setBankTenureTo("")
+                        setCriticalityFilters([])
                         setStaffPage(1)
-                        setNineBoxCellDetail(null)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {salaryMarketFilters.length > 0 ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      З/П к рынку: {salaryMarketFilters.map((item) => SALARY_MARKET_LEVEL_LABELS[item]).join(", ")}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по уровню з/п"
+                      onClick={() => {
+                        setSalaryMarketFilters([])
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {fkrStatusFilters.length > 0 ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      ФКР: {fkrStatusFilters.map((item) => FKR_STATUS_LABELS[item]).join(", ")}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по ФКР"
+                      onClick={() => {
+                        setFkrStatusFilters([])
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {overtimeFilter !== "all" ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      Переработки: {overtimeFilter === "yes" ? "ДА" : "НЕТ"}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по переработкам"
+                      onClick={() => {
+                        setOvertimeFilter("all")
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {rhythmAssessmentFilter !== "all" ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      РИТМ: {RHYTHM_FILTER_OPTIONS.find((item) => item.value === rhythmAssessmentFilter)?.label}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по РИТМ"
+                      onClick={() => {
+                        setRhythmAssessmentFilter("all")
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {externalAssessmentFilter !== "all" ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      Внешняя оценка: {EXTERNAL_FILTER_OPTIONS.find((item) => item.value === externalAssessmentFilter)?.label}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по внешней оценке"
+                      onClick={() => {
+                        setExternalAssessmentFilter("all")
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {surveyResultFilters.length > 0 ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      Опрос: результат {surveyResultFilters.map((value) => SURVEY_CATEGORY_LABELS[value]).join(", ")}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по опросу результата"
+                      onClick={() => {
+                        setSurveyResultFilters([])
+                        setStaffPage(1)
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ) : null}
+                {surveyInteractionFilters.length > 0 ? (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground">
+                    <span className="truncate">
+                      Опрос: команда{" "}
+                      {surveyInteractionFilters.map((value) => SURVEY_CATEGORY_LABELS[value]).join(", ")}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="Очистить фильтр по опросу команды"
+                      onClick={() => {
+                        setSurveyInteractionFilters([])
+                        setStaffPage(1)
                       }}
                     >
                       x
@@ -908,50 +1856,38 @@ export default function AssessmentPage() {
               </div>
             ) : null}
             <Dialog open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
-              <DialogContent className="max-h-[90vh] w-[96vw] max-w-6xl gap-0 overflow-hidden p-0">
+              <DialogContent className="max-h-[90vh] w-[96vw] max-w-[1440px] gap-0 overflow-hidden p-0">
                 <DialogHeader className="border-b border-border px-6 py-4">
                   <DialogTitle>Фильтры</DialogTitle>
                   <DialogDescription>
-                    Настройте фильтрацию по всем столбцам таблицы.
+                    Фильтры собраны по колонкам таблицы оценки команды.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex min-h-0 flex-col gap-4 px-6 py-4">
                 <div className="flex flex-col gap-3">
                   <label className="flex flex-col gap-1.5">
-                      <span className="text-sm font-medium text-muted-foreground">ФИО</span>
-                      <Input
-                        value={fioFilterQuery}
-                        onChange={(event) => {
-                          setFioFilterQuery(event.target.value)
-                          setStaffPage(1)
-                        }}
-                        placeholder="Например: Иванов"
-                        className="h-10"
-                      />
-                    </label>
-                  <div className="my-1 border-t border-border" />
+                    <span className="text-sm font-medium text-muted-foreground">ФИО</span>
+                    <Input
+                      value={fioFilterQuery}
+                      onChange={(event) => {
+                        setFioFilterQuery(event.target.value)
+                        setStaffPage(1)
+                      }}
+                      placeholder="Введите ФИО или фрагмент"
+                      className="h-10"
+                    />
+                  </label>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <label className="flex min-w-0 flex-col gap-1.5">
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <div className="min-w-0">
                           <p className="font-medium text-muted-foreground">Должность</p>
                           <p className="truncate text-muted-foreground">
-                            Текущий фильтр:{" "}
-                            {selectedPositionIds.length === 0 ? "Все должности" : selectedPositionIds.join(", ")}
+                            {selectedPositionIds.length === 0
+                              ? "Текущий фильтр: Все должности"
+                              : `Текущий фильтр: ${selectedPositionIds.join(", ")}`}
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedPositionIds([])
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                        >
-                          Сбросить все
-                        </Button>
                       </div>
                       <Input
                         value={positionSearchQuery}
@@ -999,18 +1935,8 @@ export default function AssessmentPage() {
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <div className="min-w-0">
                           <p className="font-medium text-muted-foreground">Подразделение</p>
-                          <p className="truncate text-muted-foreground">
-                            Текущий фильтр: {currentUnitLabel}
-                          </p>
+                          <p className="truncate text-muted-foreground">{currentUnitLabel}</p>
                         </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={resetColumnFilters}
-                        >
-                          Сбросить все
-                        </Button>
                       </div>
                       <Input
                         value={unitSearchQuery}
@@ -1052,163 +1978,176 @@ export default function AssessmentPage() {
                     </div>
                   </div>
                   <div className="my-1 border-t border-border" />
-                  <div className="grid gap-3">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-muted-foreground">Стаж в Банке (лет)</span>
-                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>От: {bankTenureFrom || "0"} лет</span>
-                        <span>До: {bankTenureTo || "40"} лет</span>
-                      </div>
-                      <div className="relative mt-3 h-8">
-                        <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded bg-muted" />
-                        <div
-                          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded bg-primary"
-                          style={{
-                            left: `${((Number(bankTenureFrom || "0") / 40) * 100).toFixed(2)}%`,
-                            width: `${((Number(bankTenureTo || "40") - Number(bankTenureFrom || "0")) / 40) * 100}%`,
-                          }}
-                        />
-                        <input
-                          type="range"
-                          min={0}
-                          max={40}
-                          value={bankTenureFrom || "0"}
-                          onChange={(event) => {
-                            const nextFrom = Number(event.target.value)
-                            setBankTenureFrom(String(nextFrom))
-                            if (bankTenureTo && nextFrom > Number(bankTenureTo)) {
-                              setBankTenureTo(String(nextFrom))
-                            }
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          className="absolute inset-0 z-20 h-2 w-full cursor-pointer appearance-none bg-transparent"
-                        />
-                        <input
-                          type="range"
-                          min={0}
-                          max={40}
-                          value={bankTenureTo || "40"}
-                          onChange={(event) => {
-                            const nextTo = Number(event.target.value)
-                            setBankTenureTo(String(nextTo))
-                            if (bankTenureFrom && nextTo < Number(bankTenureFrom)) {
-                              setBankTenureFrom(String(nextTo))
-                            }
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          className="absolute inset-0 z-10 h-2 w-full cursor-pointer appearance-none bg-transparent"
-                        />
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">Результат оценки</span>
+                      <div className="space-y-1 rounded-md border border-border p-2">
+                        {CRITICALITY_FILTER_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={criticalityFilters.includes(option.value)}
+                              onChange={() =>
+                                toggleFilterValue(
+                                  option.value,
+                                  setCriticalityFilters
+                                )
+                              }
+                            />
+                            <span className="min-w-0 leading-snug">{option.label}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-0.5">
-                      <div className="col-span-1 sm:col-span-2">
-                        <span className="text-sm font-medium text-muted-foreground">
-                          Стаж в Блоке, ССП (лет)
-                        </span>
-                      </div>
-                      <div className="flex flex-col">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={blockTenureFrom}
-                          onChange={(event) => {
-                            setBlockTenureFrom(event.target.value)
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          placeholder="От"
-                          className="h-10 w-1/2"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={blockTenureTo}
-                          onChange={(event) => {
-                            setBlockTenureTo(event.target.value)
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          placeholder="До"
-                          className="h-10 w-1/2"
-                        />
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">З/П к рынку</span>
+                      <div className="space-y-1 rounded-md border border-border p-2">
+                        {SALARY_MARKET_LEVEL_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={salaryMarketFilters.includes(option.value)}
+                              onChange={() =>
+                                toggleFilterValue(option.value, setSalaryMarketFilters)
+                              }
+                            />
+                            <span className="min-w-0 leading-snug">{option.label}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-0.5">
-                      <div className="col-span-1 sm:col-span-2">
-                        <span className="text-sm font-medium text-muted-foreground">Возраст</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={ageFrom}
-                          onChange={(event) => {
-                            setAgeFrom(event.target.value)
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          placeholder="От"
-                          className="h-10 w-1/2"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={ageTo}
-                          onChange={(event) => {
-                            setAgeTo(event.target.value)
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          placeholder="До"
-                          className="h-10 w-1/2"
-                        />
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">ФКР</span>
+                      <div className="space-y-1 rounded-md border border-border p-2">
+                        {FKR_STATUS_FILTER_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={fkrStatusFilters.includes(option.value)}
+                              onChange={() =>
+                                toggleFilterValue(option.value, setFkrStatusFilters)
+                              }
+                            />
+                            <span className="min-w-0 leading-snug">{option.label}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-0.5">
-                      <div className="col-span-1 sm:col-span-2">
-                        <span className="text-sm font-medium text-muted-foreground">
-                          Дней неиспользованного отпуска
-                        </span>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">Переработки</span>
+                      <select
+                        value={overtimeFilter}
+                        onChange={(event) => {
+                          setOvertimeFilter(event.target.value as OvertimeFilter)
+                          setStaffPage(1)
+                          setNineBoxCellDetail(null)
+                        }}
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        {OVERTIME_FILTER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">РИТМ</span>
+                      <select
+                        value={rhythmAssessmentFilter}
+                        onChange={(event) => {
+                          setRhythmAssessmentFilter(event.target.value as RhythmExternalFilter)
+                          setStaffPage(1)
+                          setNineBoxCellDetail(null)
+                        }}
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        {RHYTHM_FILTER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">Внешняя оценка</span>
+                      <select
+                        value={externalAssessmentFilter}
+                        onChange={(event) => {
+                          setExternalAssessmentFilter(event.target.value as RhythmExternalFilter)
+                          setStaffPage(1)
+                          setNineBoxCellDetail(null)
+                        }}
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        {EXTERNAL_FILTER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">Опрос - результат</span>
+                      <div className="space-y-1 rounded-md border border-border p-2">
+                        {SURVEY_CATEGORY_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={surveyResultFilters.includes(option.value)}
+                              onChange={() =>
+                                toggleFilterValue(option.value, setSurveyResultFilters)
+                              }
+                            />
+                            <span className="min-w-0 leading-snug">{option.label}</span>
+                          </label>
+                        ))}
                       </div>
-                      <div className="flex flex-col">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={vacationDaysFrom}
-                          onChange={(event) => {
-                            setVacationDaysFrom(event.target.value)
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          placeholder="От"
-                          className="h-10 w-1/2"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={vacationDaysTo}
-                          onChange={(event) => {
-                            setVacationDaysTo(event.target.value)
-                            setStaffPage(1)
-                            setNineBoxCellDetail(null)
-                          }}
-                          placeholder="До"
-                          className="h-10 w-1/2"
-                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">Опрос - команда</span>
+                      <div className="space-y-1 rounded-md border border-border p-2">
+                        {SURVEY_CATEGORY_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={surveyInteractionFilters.includes(option.value)}
+                              onChange={() =>
+                                toggleFilterValue(option.value, setSurveyInteractionFilters)
+                              }
+                            />
+                            <span className="min-w-0 leading-snug">{option.label}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
                   </div>
-                </div>
+                  </div>
                 </div>
                 <div className="flex justify-end border-t border-border px-6 py-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mr-2"
+                    onClick={resetColumnFilters}
+                  >
+                    Сбросить все
+                  </Button>
                   <Button type="button" onClick={() => setIsFiltersOpen(false)}>
                     Применить
                   </Button>
@@ -1216,52 +2155,101 @@ export default function AssessmentPage() {
               </DialogContent>
             </Dialog>
             <div className="min-h-0 flex-1 overflow-auto">
-              <table className="w-full min-w-[680px] table-fixed border-collapse text-left text-sm">
+              <table
+                className={`w-full table-fixed border-collapse text-left text-sm ${
+                  isFullTableView ? "min-w-[1460px]" : "min-w-[980px]"
+                }`}
+              >
                 <colgroup>
-                    <col className="w-[25%]" />
-                  <col className="w-[18%]" />
-                  <col className="w-[5%]" />
-                  <col className="w-[5%]" />
-                  <col className="w-[5%]" />
-                  <col className="w-[5%]" />
-                  <col className="w-[5%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[5%]" />
+                  {isFullTableView ? (
+                    <>
+                      <col className="w-[22%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[7%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[7%]" />
+                      <col className="w-[7%]" />
+                      <col className="w-[7%]" />
+                      <col className="w-[7%]" />
+                    </>
+                  ) : (
+                    <>
+                      <col className="w-[34%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
+                    </>
+                  )}
                 </colgroup>
                 <thead className="sticky top-0 z-10 border-b border-border bg-muted/80 backdrop-blur-sm">
                   <tr className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                     <th className="px-2 py-2 font-medium">ФИО</th>
-                    <th className="px-2 py-2 font-medium">Подразделение</th>
-                    <th className="px-2 py-2 font-medium">Стаж в Банке</th>
-                    <th className="px-2 py-2 font-medium">Стаж в Блоке, ССП</th>
-                    <th className="px-2 py-2 font-medium">Возраст</th>
-                    <th className="px-2 py-2 font-medium">дни неисп. отпуска</th>
-                    <th className="px-2 py-2 font-medium">Переработки</th>
-                    <th className="px-2 py-2 font-medium">Уровень З/П относительно рынка</th>
-                    <th className="px-2 py-2 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>Опрос - результат</span>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
-                          Опрос - категория по вкладу в результат
-                        </TooltipContent>
-                      </Tooltip>
+                    <th className="border-l border-border bg-muted/40 px-2 py-2 text-center font-medium text-foreground">
+                      Результат оценки
                     </th>
-                    <th className="px-2 py-2 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span>Опрос - команда</span>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
-                            Опрос - категория по команде
-                        </TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="w-[5%] px-2 py-2 font-medium">оценка РИТМ</th>
-                    <th className="w-[5%] px-2 py-2 font-medium">внешняя оценка</th>
+                    <th className="px-2 py-2 font-medium">Категория сотрудника</th>
+                    <th className="px-2 py-2 font-medium">Вероятность увольнения</th>
+                    {isFullTableView ? (
+                      <>
+                        <th className="px-2 py-2 font-medium">ФКР</th>
+                        <th className="px-2 py-2 font-medium">З/П к рынку</th>
+                        <th className="px-2 py-2 font-medium">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>Переработки</span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
+                              Признак наличия переработок за последний месяц.
+                              {" "}
+                              Значение ДА — есть сверхурочные часы.
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                        <th className="px-2 py-2 font-medium">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>РИТМ</span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
+                              ДА — если РИТМ оценки ≥ 4, НЕТ — если &lt; 4.
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                        <th className="px-2 py-2 font-medium">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>Внешняя оценка</span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
+                              ДА — если внешняя оценка ≥ 4, НЕТ — если &lt; 4.
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                        <th className="px-2 py-2 font-medium">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>Опрос результат</span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
+                              Опрос - категория по вкладу в результат
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                        <th className="px-2 py-2 font-medium">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>Опрос команда</span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm">
+                              Опрос - категория по команде
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                      </>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -1274,195 +2262,224 @@ export default function AssessmentPage() {
                       salaryMarketLevelOverrides[s.id] ??
                       s.salaryMarketLevel ??
                       "not-selected"
+                    const currentFkrStatus = s.fkrStatus ?? "not-included"
                     const currentSurveyResultCategory = s.surveyResultCategory ?? "middle"
                     const currentSurveyInteractionCategory = s.surveyInteractionCategory ?? "middle"
+                    const employeeCategory =
+                      employeeCategoryOverrides[s.id] ??
+                      getEmployeeCategory(s, currentSalaryMarketLevel)
+                    const resignationProbability =
+                      resignationProbabilityOverrides[s.id] ??
+                      getResignationProbability(s, currentSalaryMarketLevel)
+                    const { isFormed: isGradeFormed, missingFields } = hasRequiredAssessment(
+                      employeeCategory,
+                      resignationProbability
+                    )
+                    const assessmentGrade = getAssessmentGrade(employeeCategory, resignationProbability)
+                    const hasNotebookComment = (staffNotebookEntries[s.id] ?? []).length > 0
                     return (
                       <tr key={s.id} className="border-b border-border/80 hover:bg-muted/40">
                         <td className="min-w-0 px-2 py-2 align-middle">
                           <div className="flex min-w-0 items-center gap-2">
-                                <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary ring-1 ring-primary/25">
+                            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary ring-1 ring-primary/25">
                               {makeInitials(s.lastName, s.firstName, s.patronymic)}
                             </span>
-                                <div className="min-w-0">
-                                  <p className="truncate font-medium">
-                                    {formatFio(s.lastName, s.firstName, s.patronymic)}
-                                  </p>
-                                  <p className="mt-0.5 line-clamp-2 break-words leading-snug text-muted-foreground">
-                                    {s.position}
-                                  </p>
-                                </div>
-                          </div>
-                        </td>
-                        <td className="min-w-0 px-3 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words leading-snug">{unitPath}</span>
-                        </td>
-                        <td className="min-w-0 w-[5%] px-2 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words leading-snug">
-                            {parseTenureYears(s.bankTenure) ?? "—"}
-                          </span>
-                        </td>
-                        <td className="min-w-0 w-[5%] px-2 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words leading-snug">
-                            {parseTenureYears(s.blockTenure) ?? "—"}
-                          </span>
-                        </td>
-                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words leading-snug">
-                            {s.age ?? "—"}
-                          </span>
-                        </td>
-                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words leading-snug">
-                            {s.unusedVacationDays ?? "—"}
-                          </span>
-                        </td>
-                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="line-clamp-2 break-words leading-snug">
-                                {((s.overtimeHoursLastMonth ?? 0) > 0 && typeof s.overtimeHoursLastMonth === "number") ? (
-                                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                    ДА
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                                    НЕТ
-                                  </span>
-                                )}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
-                              <div className="flex flex-col gap-1.5">
-                                <div className="font-semibold text-foreground">
-                                  СУРВ информация за 3 последних календарных месяца (среднее за рабочий день):
-                                </div>
-                                <div className="flex items-center justify-between gap-2 text-muted-foreground">
-                                  <span>Чистое время в офисе</span>
-                                  <span className="font-semibold tabular-nums text-foreground">
-                                    {formatMinutesToHourMinute(s.overtimeOfficeMinutesLast3Months)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between gap-2 text-muted-foreground">
-                                  <span>Общее время работы за компьютером</span>
-                                  <span className="font-semibold tabular-nums text-foreground">
-                                    {formatMinutesToHourMinute(s.overtimeComputerMinutesLast3Months)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between gap-2 text-muted-foreground">
-                                  <span>Работа за ПК + звонки</span>
-                                  <span className="font-semibold tabular-nums text-foreground">
-                                    {formatMinutesToHourMinute(s.overtimeComputerAndCallsMinutesLast3Months)}
-                                  </span>
-                                </div>
-                                <div className="mt-0.5 flex items-center justify-between gap-2 border-t border-border pt-1">
-                                  <span className="text-muted-foreground">Режим работы:</span>
-                                  <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
-                                    {s.workMode || "гибкий режим"}
-                                  </span>
-                                </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-0.5 flex min-w-0 items-center gap-1">
+                                <button
+                                  type="button"
+                                  className="block max-w-full truncate text-left font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  onClick={() => setSelectedStaffMember(s)}
+                                >
+                                  {formatFio(s.lastName, s.firstName, s.patronymic)}
+                                </button>
                               </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </td>
-                        <td className="min-w-0 px-2 py-2 align-middle">
-                          <label
-                            className="sr-only"
-                            htmlFor={`salary-market-level-${s.id}`}
-                          >
-                            Уровень з/п относительно рынка для сотрудника{" "}
-                            {formatFio(s.lastName, s.firstName, s.patronymic)}
-                          </label>
-                          <div className="relative">
-                            <select
-                              id={`salary-market-level-${s.id}`}
-                              value={currentSalaryMarketLevel}
-                              onChange={(event) => {
-                                setSalaryMarketLevelOverrides((prev) => ({
-                                  ...prev,
-                                  [s.id]: event.target.value as SalaryMarketLevel,
-                                }))
-                                setNineBoxCellDetail(null)
-                              }}
-                              className={`h-7 min-w-0 w-full rounded-full border border-input px-2 py-1 text-xs font-semibold ${SALARY_MARKET_LEVEL_CLASSES[currentSalaryMarketLevel]}`}
-                            >
-                              {SALARY_MARKET_LEVEL_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {SALARY_MARKET_LEVEL_LABELS[option.value]}
-                                </option>
-                              ))}
-                            </select>
+                              <p className="mt-0.5 line-clamp-1 break-words leading-snug text-muted-foreground">
+                                {s.position}
+                              </p>
+                              <p className="mt-0.5 line-clamp-1 break-words text-xs leading-snug text-muted-foreground">
+                                {unitPath}
+                              </p>
+                            </div>
+                            <div className="ml-2 flex h-full flex-col justify-center">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className={`h-12 w-12 rounded-full p-0 transition ${
+                                  hasNotebookComment
+                                    ? "text-emerald-700 hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                    : "text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-400"
+                                }`}
+                                aria-label={`Открыть записную книжку ${formatFio(s.lastName, s.firstName, s.patronymic)}`}
+                                onClick={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  openStaffNotebook(s)
+                                }}
+                              >
+                <MessageSquare className="h-16 w-16" strokeWidth={hasNotebookComment ? 4.5 : 2.5} />
+                              </Button>
+                            </div>
                           </div>
                         </td>
-                        <td className="min-w-0 px-2 py-2 align-middle">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${SURVEY_CATEGORY_CLASSES[currentSurveyResultCategory]}`}
-                          >
-                            {currentSurveyResultCategory}
-                          </span>
-                          <span className="sr-only">
-                            Опрос - категория по вкладу в результат для сотрудника{" "}
-                            {formatFio(s.lastName, s.firstName, s.patronymic)}:{" "}
-                            {currentSurveyResultCategory}
-                          </span>
+                        <td className="min-w-0 border-l border-border bg-muted/20 px-2 py-2 text-center align-middle">
+                          {isGradeFormed ? (
+                            <span
+                              className={`inline-flex min-h-7 min-w-9 items-center justify-center rounded-full border font-semibold ${CRITICALITY_LEVEL_CLASSES[assessmentGrade]}`}
+                            >
+                              {CRITICALITY_LEVEL_LABELS[assessmentGrade]}
+                            </span>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex min-h-7 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 bg-muted/30 px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                                  НЕ СФОРМИРОВАН
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-sm bg-popover text-popover-foreground text-sm leading-relaxed">
+                                <div className="space-y-2">
+                                  <p className="font-semibold">Результат оценки не сформирован</p>
+                                  <p className="text-xs text-muted-foreground">Для формирования результата оценки заполните:</p>
+                                  <ul className="space-y-1 text-xs text-muted-foreground">
+                                    {missingFields.map((item) => (
+                                      <li
+                                        key={item}
+                                        className="inline-flex w-full items-start gap-2"
+                                      >
+                                        <span className="mt-1.5 inline-flex size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
+                                        <span>{item}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  <p className="text-xs text-muted-foreground">
+                                    После выбора значений оценка пересчитывается автоматически.
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </td>
                         <td className="min-w-0 px-2 py-2 align-middle">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${SURVEY_CATEGORY_CLASSES[currentSurveyInteractionCategory]}`}
+                          <select
+                            value={employeeCategory}
+                            aria-label={`Категория сотрудника ${formatFio(s.lastName, s.firstName, s.patronymic)}`}
+                            onChange={(event) => {
+                              setEmployeeCategoryOverrides((prev) => ({
+                                ...prev,
+                                [s.id]: event.target.value as EmployeeCategoryLevel,
+                              }))
+                            }}
+                            className={`h-7 min-w-0 w-full cursor-pointer rounded-full border border-input px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${EMPLOYEE_CATEGORY_CLASSES[employeeCategory]}`}
                           >
-                            {currentSurveyInteractionCategory}
-                          </span>
-                          <span className="sr-only">
-                            Опрос - категория по команде для сотрудника{" "}
-                            {formatFio(s.lastName, s.firstName, s.patronymic)}:{" "}
-                            {currentSurveyInteractionCategory}
-                          </span>
+                            {EMPLOYEE_CATEGORY_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </td>
-                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words leading-snug">
-                            {s.rhythmAssessmentResult === undefined
-                              ? "—"
-                              : s.rhythmAssessmentResult >= 4 ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                      ДА
-                                    </span>
-                                  </TooltipTrigger>
-                                  <AssessmentTooltipContent
-                                    baseScore={s.rhythmAssessmentResult}
-                                    title="Оценка РИТМ"
-                                  />
-                                </Tooltip>
+                        <td className="min-w-0 px-2 py-2 align-middle">
+                          <select
+                            value={resignationProbability}
+                            aria-label={`Вероятность увольнения ${formatFio(s.lastName, s.firstName, s.patronymic)}`}
+                            onChange={(event) => {
+                              setResignationProbabilityOverrides((prev) => ({
+                                ...prev,
+                                [s.id]: event.target.value as ResignationProbabilityLevel,
+                              }))
+                            }}
+                            className={`h-7 min-w-0 w-full cursor-pointer rounded-full border border-input px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${RESIGNATION_PROBABILITY_CLASSES[resignationProbability]}`}
+                          >
+                            {RESIGNATION_PROBABILITY_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        {isFullTableView ? (
+                          <>
+                            <td className="min-w-0 px-2 py-2 align-middle">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${FKR_STATUS_CLASSES[currentFkrStatus]}`}
+                              >
+                                {FKR_STATUS_LABELS[currentFkrStatus]}
+                              </span>
+                            </td>
+                            <td className="min-w-0 px-2 py-2 align-middle">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${SALARY_MARKET_LEVEL_CLASSES[currentSalaryMarketLevel]}`}
+                              >
+                                {SALARY_MARKET_LEVEL_LABELS[currentSalaryMarketLevel]}
+                              </span>
+                            </td>
+                            <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                              {(s.overtimeHoursLastMonth ?? 0) > 0 &&
+                              typeof s.overtimeHoursLastMonth === "number" ? (
+                                <span
+                                  className={`inline-flex rounded-full bg-emerald-100 px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200`}
+                                >
+                                  ДА
+                                </span>
                               ) : (
-                                <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                <span
+                                  className={`inline-flex rounded-full bg-muted px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-muted-foreground`}
+                                >
                                   НЕТ
                                 </span>
                               )}
-                          </span>
-                        </td>
-                        <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
-                          <span className="line-clamp-2 break-words leading-snug">
-                            {s.externalAssessmentResult === undefined ? (
-                              "—"
-                            ) : s.externalAssessmentResult >= 4 ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                    ДА
-                                  </span>
-                                </TooltipTrigger>
-                                <AssessmentTooltipContent
-                                  baseScore={s.externalAssessmentResult}
-                                  title="Внешняя оценка"
-                                />
-                              </Tooltip>
-                            ) : (
-                              <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                                НЕТ
+                            </td>
+                            <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                              {s.rhythmAssessmentResult === undefined ? (
+                                "—"
+                              ) : s.rhythmAssessmentResult >= 4 ? (
+                                <span
+                                  className={`inline-flex rounded-full bg-emerald-100 px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200`}
+                                >
+                                  ДА
+                                </span>
+                              ) : (
+                                <span
+                                  className={`inline-flex rounded-full bg-muted px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-muted-foreground`}
+                                >
+                                  НЕТ
+                                </span>
+                              )}
+                            </td>
+                            <td className="min-w-0 px-2 py-2 align-middle text-muted-foreground">
+                              {s.externalAssessmentResult === undefined ? (
+                                "—"
+                              ) : s.externalAssessmentResult >= 4 ? (
+                                <span
+                                  className={`inline-flex rounded-full bg-emerald-100 px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200`}
+                                >
+                                  ДА
+                                </span>
+                              ) : (
+                                <span
+                                  className={`inline-flex rounded-full bg-muted px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-muted-foreground`}
+                                >
+                                  НЕТ
+                                </span>
+                              )}
+                            </td>
+                            <td className="min-w-0 px-2 py-2 align-middle">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${SURVEY_CATEGORY_CLASSES[currentSurveyResultCategory]}`}
+                              >
+                                {SURVEY_CATEGORY_LABELS[currentSurveyResultCategory]}
                               </span>
-                            )}
-                          </span>
-                        </td>
+                            </td>
+                            <td className="min-w-0 px-2 py-2 align-middle">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${SURVEY_CATEGORY_CLASSES[currentSurveyInteractionCategory]}`}
+                              >
+                                {SURVEY_CATEGORY_LABELS[currentSurveyInteractionCategory]}
+                              </span>
+                            </td>
+                          </>
+                        ) : null}
                       </tr>
                     )
                   })}
@@ -1518,6 +2535,449 @@ export default function AssessmentPage() {
                 </div>
               ) : null}
             </div>
+            <Dialog
+              open={selectedStaffMember !== null}
+              onOpenChange={(open) => {
+                if (!open) setSelectedStaffMember(null)
+              }}
+            >
+              <DialogContent className="max-h-[90vh] w-[96vw] max-w-6xl gap-0 overflow-hidden p-0">
+                {selectedStaffMember ? (
+                  <>
+                    <DialogHeader className="border-b border-border px-6 py-4">
+                      <DialogTitle>
+                        {formatFio(
+                          selectedStaffMember.lastName,
+                          selectedStaffMember.firstName,
+                          selectedStaffMember.patronymic
+                        )}
+                      </DialogTitle>
+                      <DialogDescription>
+                        Большая карточка сотрудника: профиль, оценки, кадровые события и риск-сигналы.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[calc(90vh-96px)] overflow-y-auto px-6 py-5">
+                      <div className="flex flex-col gap-5">
+                        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                            <div className="flex min-w-0 items-start gap-4">
+                              <span className="flex size-16 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-lg font-semibold text-primary ring-1 ring-primary/25">
+                                {makeInitials(
+                                  selectedStaffMember.lastName,
+                                  selectedStaffMember.firstName,
+                                  selectedStaffMember.patronymic
+                                )}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-lg font-semibold text-foreground">
+                                  {formatFio(
+                                    selectedStaffMember.lastName,
+                                    selectedStaffMember.firstName,
+                                    selectedStaffMember.patronymic
+                                  )}
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {selectedStaffMember.position}
+                                </p>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className="mt-3 cursor-help rounded-lg border border-border/70 bg-muted/20 px-3 py-2 transition-colors hover:border-primary/40 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                      tabIndex={0}
+                                    >
+                                      <p className="text-xs text-muted-foreground">Подразделение</p>
+                                      <p className="mt-1 text-sm leading-snug text-foreground">
+                                        {selectedStaffUnitPath || "Подразделение не указано"}
+                                      </p>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
+                                    Организационный контекст сотрудника. Важен для сопоставления роли, нагрузки, руководителя и кадровых решений.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-border bg-card shadow-sm">
+                            <div className="border-b border-border bg-muted/35 px-4 py-3">
+                              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Ключевые сигналы
+                              </h3>
+                            </div>
+                            <dl className="flex flex-col gap-3 p-4">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex cursor-help items-center justify-between gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-muted/50">
+                                    <dt className="text-xs text-muted-foreground">Результат оценки</dt>
+                                    <dd>
+                                      <CriticalityTag level={selectedStaffCriticality} />
+                                    </dd>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
+                                  Итоговый приоритет внимания к сотруднику. Значение формирует быстрый фокус для управленческого решения.
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex cursor-help items-center justify-between gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-muted/50">
+                                    <dt className="text-xs text-muted-foreground">ФКР</dt>
+                                    <dd>
+                                      <DetailTag className={FKR_STATUS_CLASSES[selectedStaffFkrStatus]}>
+                                        {FKR_STATUS_LABELS[selectedStaffFkrStatus]}
+                                      </DetailTag>
+                                    </dd>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
+                                  Быстрый признак включения в кадровый контур. Помогает понять, есть ли по сотруднику отдельный фокус развития.
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex cursor-help items-center justify-between gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-muted/50">
+                                    <dt className="text-xs text-muted-foreground">З/П к рынку</dt>
+                                    <dd className="text-right">
+                                      <DetailTag className={SALARY_MARKET_LEVEL_CLASSES[selectedStaffSalaryMarketLevel]}>
+                                        {SALARY_MARKET_LEVEL_LABELS[selectedStaffSalaryMarketLevel]}
+                                      </DetailTag>
+                                    </dd>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed">
+                                  Краткий компенсационный сигнал. Нужен для оценки риска удержания и приоритизации пересмотра оклада.
+                                </TooltipContent>
+                              </Tooltip>
+                            </dl>
+                          </div>
+                        </div>
+
+                        <Tabs defaultValue="employee-data" className="flex flex-col gap-4">
+                          <TabsList className="w-fit">
+                            <TabsTrigger value="employee-data">Данные по сотруднику</TabsTrigger>
+                            <TabsTrigger value="recommendations">Рекомендации</TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="employee-data" className="mt-0 flex flex-col gap-4">
+                            <div className="grid gap-4 lg:grid-cols-2">
+                              <DetailSection title="Профиль">
+                                <dl className="grid gap-3 sm:grid-cols-2">
+                              <DetailItem
+                                label="Табельный номер"
+                                value={selectedStaffMember.personnelNumber}
+                                insight="Идентификатор сотрудника в кадровых системах. Помогает точно сопоставлять записи между источниками данных."
+                              />
+                              <DetailItem
+                                label="Логин"
+                                value={selectedStaffMember.login ?? "—"}
+                                insight="Корпоративная учётная запись. Полезна для проверки активности и связки с ИТ-данными."
+                              />
+                              <DetailItem
+                                label="Стаж в Банке"
+                                value={selectedStaffMember.bankTenure ?? "—"}
+                                insight="Показывает глубину опыта внутри банка. Длинный стаж помогает оценить экспертизу и возможную роль носителя знаний."
+                              />
+                              <DetailItem
+                                label="Стаж в Блоке, ССП"
+                                value={selectedStaffMember.blockTenure ?? "—"}
+                                insight="Отражает опыт именно в текущем бизнес-контексте. Важен для оценки адаптации и устойчивости в роли."
+                              />
+                              <DetailItem
+                                label="Возраст"
+                                value={selectedStaffMember.age ?? "—"}
+                                insight="Используется только как демографический контекст. Сам по себе не является оценочным выводом."
+                              />
+                              <DetailItem
+                                label="Дней неисп. отпуска"
+                                value={selectedStaffMember.unusedVacationDays ?? "—"}
+                                insight="Высокий остаток отпуска может быть косвенным сигналом нагрузки, риска выгорания или проблем с планированием замещения."
+                              />
+                                </dl>
+                              </DetailSection>
+
+                              <DetailSection title="Нагрузка и режим">
+                                <dl className="grid gap-3 sm:grid-cols-2">
+                              <DetailItem
+                                label="Переработки"
+                                insight="Показывает наличие признаков повышенной нагрузки. Важно сопоставлять с режимом работы, СУРВ-данными и результативностью."
+                                value={
+                                  (selectedStaffMember.overtimeHoursLastMonth ?? 0) > 0 ? (
+                                    <DetailTag className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                      ДА
+                                    </DetailTag>
+                                  ) : (
+                                    <DetailTag className="bg-muted text-muted-foreground">
+                                      НЕТ
+                                    </DetailTag>
+                                  )
+                                }
+                              />
+                              <DetailItem
+                                label="Режим работы"
+                                value={selectedStaffMember.workMode ?? "—"}
+                                insight="Помогает корректно трактовать офисное время и переработки: разные режимы дают разные нормы присутствия."
+                              />
+                              <DetailItem
+                                label="Чистое время в офисе"
+                                value={formatMinutesToHourMinute(selectedStaffMember.overtimeOfficeMinutesLast3Months)}
+                                insight="Среднее чистое присутствие в офисе за рабочий день. Используется как один из сигналов фактической нагрузки."
+                              />
+                              <DetailItem
+                                label="Работа за компьютером"
+                                value={formatMinutesToHourMinute(selectedStaffMember.overtimeComputerMinutesLast3Months)}
+                                insight="Отражает цифровую активность за рабочий день. Рост показателя без результата может сигнализировать о перегрузке или неэффективности."
+                              />
+                              <DetailItem
+                                label="ПК + звонки"
+                                value={formatMinutesToHourMinute(selectedStaffMember.overtimeComputerAndCallsMinutesLast3Months)}
+                                insight="Суммарная активность за компьютером и в звонках. Помогает оценить коммуникационную и операционную нагрузку."
+                              />
+                                </dl>
+                              </DetailSection>
+
+                            </div>
+
+                            <div className="grid gap-4 lg:grid-cols-3">
+                              <DetailSection title="Оценки и опросы">
+                                <dl className="grid gap-3 sm:grid-cols-2">
+                              <DetailItem
+                                label="Опрос - результат"
+                                insight="Категория по вкладу в результат. Низкая категория требует сверки с фактическими задачами и ожиданиями роли."
+                                value={
+                                  <DetailTag className={SURVEY_CATEGORY_CLASSES[selectedStaffSurveyResult]}>
+                                    {SURVEY_CATEGORY_LABELS[selectedStaffSurveyResult]}
+                                  </DetailTag>
+                                }
+                              />
+                              <DetailItem
+                                label="Опрос - команда"
+                                insight="Категория по командному взаимодействию. Помогает увидеть, как сотрудник влияет на совместную работу и климат команды."
+                                value={
+                                  <DetailTag className={SURVEY_CATEGORY_CLASSES[selectedStaffSurveyTeam]}>
+                                    {SURVEY_CATEGORY_LABELS[selectedStaffSurveyTeam]}
+                                  </DetailTag>
+                                }
+                              />
+                              <DetailItem
+                                label="Оценка РИТМ"
+                                insight="Бинарный сигнал по результатам РИТМ: ДА означает, что актуальная оценка достигает целевого уровня."
+                                value={
+                                  selectedStaffMember.rhythmAssessmentResult === undefined ? (
+                                    "—"
+                                  ) : selectedStaffMember.rhythmAssessmentResult >= 4 ? (
+                                    <DetailTag className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                      ДА
+                                    </DetailTag>
+                                  ) : (
+                                    <DetailTag className="bg-muted text-muted-foreground">
+                                      НЕТ
+                                    </DetailTag>
+                                  )
+                                }
+                              />
+                              <DetailItem
+                                label="Балл РИТМ"
+                                value={selectedStaffMember.rhythmAssessmentResult ?? "—"}
+                                insight="Числовой результат РИТМ от 1 до 5. Значения 4-5 трактуются как положительный сигнал."
+                              />
+                              <DetailItem
+                                label="Внешняя оценка"
+                                insight="Показывает, есть ли подтверждённый положительный результат внешней оценки. Используется как независимый сигнал по сотруднику."
+                                value={
+                                  selectedStaffMember.externalAssessmentResult === undefined ? (
+                                    "—"
+                                  ) : selectedStaffMember.externalAssessmentResult >= 4 ? (
+                                    <DetailTag className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                      ДА
+                                    </DetailTag>
+                                  ) : (
+                                    <DetailTag className="bg-muted text-muted-foreground">
+                                      НЕТ
+                                    </DetailTag>
+                                  )
+                                }
+                              />
+                              <DetailItem
+                                label="Балл внешней оценки"
+                                value={selectedStaffMember.externalAssessmentResult ?? "—"}
+                                insight="Числовой результат внешней оценки от 1 до 5. Помогает сопоставить внутренние и внешние оценочные сигналы."
+                              />
+                                </dl>
+                              </DetailSection>
+
+                              <DetailSection title="Внешняя оценка">
+                                <dl className="grid gap-3 sm:grid-cols-2">
+                              <DetailItem
+                                label="Провайдер"
+                                value={selectedStaffMember.externalAssessmentProvider ?? "—"}
+                                insight="Организация, проводившая внешнюю оценку. Важна для понимания методологии и сопоставимости результата."
+                              />
+                              <DetailItem
+                                label="Период"
+                                value={selectedStaffMember.externalAssessmentYear ?? "—"}
+                                insight="Год проведения оценки. Чем старше период, тем осторожнее нужно использовать результат для текущих решений."
+                              />
+                              <DetailItem
+                                label="Файл с результатами"
+                                insight="Ссылка на первичный документ с результатами внешней оценки. Используется для проверки деталей и источника вывода."
+                                value={
+                                  selectedStaffMember.externalAssessmentResultPdf ? (
+                                    <a
+                                      href={selectedStaffMember.externalAssessmentResultPdf}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-primary underline underline-offset-2 hover:text-primary/80"
+                                    >
+                                      {selectedStaffMember.externalAssessmentResultPdf.split("/").at(-1)}
+                                    </a>
+                                  ) : (
+                                    "—"
+                                  )
+                                }
+                              />
+                                </dl>
+                              </DetailSection>
+
+                              <DetailSection title="Компенсация и кадровые события">
+                                <dl className="grid gap-3 sm:grid-cols-2">
+                              <DetailItem
+                                label="Уровень З/П относительно рынка"
+                                insight="Сравнивает компенсацию с рыночным ориентиром. Низкий уровень при сильных оценках может усиливать риск удержания."
+                                value={
+                                  <DetailTag className={SALARY_MARKET_LEVEL_CLASSES[selectedStaffSalaryMarketLevel]}>
+                                    {SALARY_MARKET_LEVEL_LABELS[selectedStaffSalaryMarketLevel]}
+                                  </DetailTag>
+                                }
+                              />
+                              <DetailItem
+                                label="ФКР"
+                                insight="Показывает, входит ли сотрудник в кадровый резерв или фокусный кадровый контур. Важно для планирования развития и преемственности."
+                                value={
+                                  <DetailTag className={FKR_STATUS_CLASSES[selectedStaffFkrStatus]}>
+                                    {FKR_STATUS_LABELS[selectedStaffFkrStatus]}
+                                  </DetailTag>
+                                }
+                              />
+                              <DetailItem
+                                label="Дата пересмотра должности"
+                                value={selectedStaffMember.positionReviewDate ?? "—"}
+                                insight="Дата последнего или планового пересмотра должности. Помогает видеть актуальность роли и возможные кадровые ожидания."
+                              />
+                              <DetailItem
+                                label="Дата пересмотра оклада"
+                                value={selectedStaffMember.salaryReviewDate ?? "—"}
+                                insight="Дата последнего или планового пересмотра оклада. Важна для оценки компенсационного риска и своевременности решений."
+                              />
+                                </dl>
+                              </DetailSection>
+
+                            </div>
+                          </TabsContent>
+
+                          <TabsContent value="recommendations" className="mt-0">
+                            <div className="grid gap-4 lg:grid-cols-2">
+                              <DetailSection title="Сильные стороны">
+                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
+                                  <li>
+                                    Стаж в банке и в блоке указывает на накопленный организационный капитал:
+                                    сотрудник понимает внутренние процессы, стейкхолдеров и неформальные правила принятия решений.
+                                  </li>
+                                  <li>
+                                    Результаты РИТМ и внешней оценки дают основу для калибровки по модели evidence-based HR:
+                                    решения по развитию и удержанию можно опирать не только на мнение руководителя, но и на независимые сигналы.
+                                  </li>
+                                  <li>
+                                    Статус ФКР:{" "}
+                                    <DetailTag className={FKR_STATUS_CLASSES[selectedStaffFkrStatus]}>
+                                      {FKR_STATUS_LABELS[selectedStaffFkrStatus]}
+                                    </DetailTag>
+                                    {" "}помогает определить, стоит ли рассматривать сотрудника как элемент кадровой преемственности,
+                                    участника talent pool или кандидата на расширение роли.
+                                  </li>
+                                  <li>
+                                    При категории опроса по результату{" "}
+                                    <DetailTag className={SURVEY_CATEGORY_CLASSES[selectedStaffSurveyResult]}>
+                                      {selectedStaffSurveyResult}
+                                    </DetailTag>
+                                    {" "}важно зафиксировать конкретные поведенческие примеры вклада, чтобы сильные стороны можно было масштабировать.
+                                  </li>
+                                </ul>
+                              </DetailSection>
+
+                              <DetailSection title="Зоны развития">
+                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
+                                  <li>
+                                    Провести калибровочную беседу по двум осям: вклад в результат и командное взаимодействие.
+                                    Если оценки расходятся, использовать подход “performance x behavior”, чтобы не развивать только результат в ущерб команде.
+                                  </li>
+                                  <li>
+                                    Сверить СУРВ-показатели, переработки и режим работы с фактическим портфелем задач.
+                                    В мировой практике это часть workload review: важно понять, нагрузка создаёт ценность или маскирует неэффективность процесса.
+                                  </li>
+                                  <li>
+                                    Уточнить ожидания по роли и карьерному шагу, особенно если даты пересмотра должности или оклада приближаются.
+                                    Рекомендуется оформить 2-3 измеримых результата на следующий квартал.
+                                  </li>
+                                  <li>
+                                    Если баллы оценки ниже целевого уровня, не ограничиваться обучением: определить, что мешает результату —
+                                    навыки, полномочия, приоритеты, качество постановки задач или конфликт целей.
+                                  </li>
+                                </ul>
+                              </DetailSection>
+
+                              <DetailSection title="Возможности">
+                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
+                                  <li>
+                                    При положительных оценочных сигналах использовать stretch assignment: дать проект выше текущего уровня сложности,
+                                    но с понятным спонсором, сроком и критериями успеха.
+                                  </li>
+                                  <li>
+                                    Подготовить IDP на 3-6 месяцев: одна бизнес-цель, одна поведенческая компетенция,
+                                    один измеримый артефакт результата и регулярные check-in встречи.
+                                  </li>
+                                  <li>
+                                    Синхронизировать компенсационные решения с вкладом, рынком и кадровым статусом.
+                                    Если сотрудник ниже рынка и демонстрирует сильные сигналы, это кандидат на retention action.
+                                  </li>
+                                  <li>
+                                    Использовать сотрудника как носителя практик: наставничество, разбор кейсов, участие в онбординге
+                                    или передача экспертизы могут повысить устойчивость команды.
+                                  </li>
+                                </ul>
+                              </DetailSection>
+
+                              <DetailSection title="Риски">
+                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
+                                  <li>
+                                    Текущий результат оценки:{" "}
+                                    <CriticalityTag level={selectedStaffCriticality} />
+                                    . При высоком результате оценки рекомендован формат case review: руководитель, HR и при необходимости куратор функции
+                                    должны согласовать единый план действий и владельца решения.
+                                  </li>
+                                  <li>
+                                    Компенсационный риск усиливается, если уровень З/П ниже рынка при сильных оценочных сигналах.
+                                    В практике total rewards это зона риска удержания и снижения вовлечённости.
+                                  </li>
+                                  <li>
+                                    Накопленная нагрузка, переработки и неиспользованный отпуск могут указывать на риск выгорания.
+                                    Нужна проверка не только часов, но и управляемости задач: срочность, автономность, ясность приоритетов.
+                                  </li>
+                                  <li>
+                                    Если внешняя оценка, РИТМ и опросы дают разнонаправленные сигналы, нельзя принимать решение по одному показателю.
+                                    Нужна калибровка данных и управленческое интервью с примерами поведения.
+                                  </li>
+                                </ul>
+                              </DetailSection>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+              </DialogContent>
+            </Dialog>
             <Sheet
               open={isNineBoxOpen}
               onOpenChange={(open) => {
@@ -1531,69 +2991,247 @@ export default function AssessmentPage() {
                 className="!w-full !max-w-full !h-[85vh] border-t border-border bg-card"
               >
                 <SheetHeader className="border-b border-border px-6 py-4">
-                  <SheetTitle className="text-sm">9-box график подразделения</SheetTitle>
-                  <p className="text-sm text-muted-foreground">Подразделение: {currentUnitLabel}</p>
-                </SheetHeader>
-                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4">
-                  <div className="grid grid-cols-[48px_1fr] gap-2">
-                    <div className="relative flex">
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-180 [writing-mode:vertical-rl] text-base font-semibold tracking-wide text-muted-foreground">
-                        {nineBoxAxisLabels.yLabel}
+                  <SheetTitle
+                    className={`text-base font-semibold tracking-wide md:text-lg ${
+                      teamMatrixMode === "survey-nine-box"
+                        ? "text-amber-700 dark:text-amber-200"
+                        : "text-violet-700 dark:text-violet-200"
+                    }`}
+                  >
+                    <span className="font-black uppercase tracking-[0.2em]">
+                      {teamMatrixMode === "survey-nine-box" ? "9-box" : "12-box"}
+                    </span>
+                    {" "}
+                    <span className="font-medium normal-case">
+                      {teamMatrixMode === "survey-nine-box"
+                        ? "результаты опроса"
+                        : "результаты оценки руководителя"}
+                    </span>
+                  </SheetTitle>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {teamMatrixFilterTags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground"
+                      >
+                        <span className="truncate">{tag.label}</span>
+                        {tag.onClear ? (
+                          <button
+                            type="button"
+                            className="cursor-pointer rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                            aria-label={`Убрать фильтр: ${tag.label}`}
+                            onPointerDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              tag.onClear?.()
+                            }}
+                          >
+                            x
+                          </button>
+                        ) : null}
                       </span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-foreground">Сотрудников в выборке:</span>
+                    <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-border bg-muted px-2 py-1 text-sm font-bold text-foreground">
+                      {teamMatrixEmployeeStats.totalInMatrix}
+                    </span>
+                    {teamMatrixMode === "manager-twelve-box" ? (
+                      <>
+                        <span className="text-sm text-foreground">Оценены (категория+вероятность)</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-border bg-muted px-2 py-1 text-sm font-bold text-foreground">
+                              {teamMatrixEmployeeStats.evaluatedByBoth}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            className="max-w-xs bg-popover p-3 text-popover-foreground text-sm leading-relaxed"
+                          >
+                            <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                              {teamMatrixEmployeeStats.evaluatedMembers.length ? (
+                                teamMatrixEmployeeStats.evaluatedMembers.slice(0, 10).map((member) => (
+                                  <div key={member.id}>
+                                    <div className="font-medium">
+                                      {formatFio(member.lastName, member.firstName, member.patronymic)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">{member.position}</div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="text-xs text-muted-foreground">Нет оцененных сотрудников</div>
+                              )}
+                              {teamMatrixEmployeeStats.evaluatedMembers.length > 10 ? (
+                                <div className="pt-1 text-xs text-muted-foreground">
+                                  ... еще {teamMatrixEmployeeStats.evaluatedMembers.length - 10}
+                                </div>
+                              ) : null}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                        <span className="text-sm text-foreground">Не оценены</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-border bg-muted px-2 py-1 text-sm font-bold text-foreground">
+                              {teamMatrixEmployeeStats.notEvaluated}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            className="max-w-xs bg-popover p-3 text-popover-foreground text-sm leading-relaxed"
+                          >
+                            <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                              {teamMatrixEmployeeStats.notEvaluatedMembers.length ? (
+                                teamMatrixEmployeeStats.notEvaluatedMembers.slice(0, 10).map((member) => (
+                                  <div key={member.id}>
+                                    <div className="font-medium">
+                                      {formatFio(member.lastName, member.firstName, member.patronymic)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">{member.position}</div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="text-xs text-muted-foreground">Нет неоцененных сотрудников</div>
+                              )}
+                              {teamMatrixEmployeeStats.notEvaluatedMembers.length > 10 ? (
+                                <div className="pt-1 text-xs text-muted-foreground">
+                                  ... еще {teamMatrixEmployeeStats.notEvaluatedMembers.length - 10}
+                                </div>
+                              ) : null}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </>
+                    ) : null}
+                  </div>
+                </SheetHeader>
+                <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-4 py-5">
+                  <div className="grid grid-cols-[48px_1fr] gap-4">
+                    <div className="relative flex">
+                      <div className="absolute left-1/2 top-1/2 flex w-10 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-between py-2">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          strokeWidth="2.2"
+                          stroke="currentColor"
+                          className="text-muted-foreground"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M12 20V4M9 7l3-3 3 3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        <span className="rotate-180 [writing-mode:vertical-rl] text-base font-semibold tracking-wide text-muted-foreground">
+                          {teamMatrixConfig.yLabel}
+                        </span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          strokeWidth="2.2"
+                          stroke="currentColor"
+                          className="text-muted-foreground"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M12 4V20M9 17l3 3 3-3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
                     </div>
-                    <div className="grid grid-rows-3 gap-2">
-                    {nineBoxMatrixRows.map((row, yIndex) => (
+                    <div className="grid gap-4">
+                    {teamMatrixRows.map((row, yIndex) => (
                         <div
                           key={yIndex}
-                          className="grid h-[176px] grid-cols-[46px_repeat(3,minmax(0,1fr))] gap-2"
+                          className={`grid min-h-[176px] ${
+                            teamMatrixColumnCount === 4
+                              ? "grid-cols-[46px_repeat(4,minmax(0,1fr))]"
+                              : "grid-cols-[46px_repeat(3,minmax(0,1fr))]"
+                          } gap-3`}
                         >
                           <div className="flex items-center justify-center px-1 text-sm font-semibold text-muted-foreground">
-                            {nineBoxAxisLabels.y[2 - yIndex]}
+                            {teamMatrixConfig.y[
+                              isManagerTwelveBox ? yIndex : teamMatrixRowCount - 1 - yIndex
+                            ]}
                           </div>
                           {row.map((index) => {
                             const bucket = nineBoxBuckets[index]
-                            const x = index % 3
+                            const x = index % teamMatrixColumnCount
+                            const cellToneClass = getTeamMatrixCellTone(
+                              x,
+                              yIndex,
+                              teamMatrixRowCount,
+                              teamMatrixMode
+                            )
                             return (
-                              <div key={index} className="relative rounded-lg border border-border bg-background p-2">
-                                <span className="absolute right-2 top-2 inline-flex min-w-6 items-center justify-center rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                              <div
+                                key={index}
+                                className={`relative rounded-lg border-2 p-2 shadow-sm ring-1 ring-border/30 ${cellToneClass}`}
+                              >
+                                <span className="absolute right-2 top-2 inline-flex min-w-7 items-center justify-center rounded-full border-2 border-white/80 bg-slate-950/10 px-2.5 py-1 text-sm font-semibold text-slate-900 shadow-sm backdrop-blur-sm dark:bg-white/10 dark:text-foreground">
+                                  <Users size={13} className="mr-1" />
                                   {bucket.length}
                                 </span>
-                                <div className="mb-2 space-y-2 pt-8">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setNineBoxCellDetail({
-                                        roleLabel: nineBoxColumnRolesByRow[yIndex][x],
-                                        perfLabel: nineBoxAxisLabels.y[2 - yIndex],
-                                        potLabel: nineBoxAxisLabels.x[x],
-                                        bucketIndex: index,
-                                      })
-                                    }
-                                    className="absolute left-2 top-2 inline-flex max-w-[calc(100%-3rem)] cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-left text-[11px] font-medium tracking-wide text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  >
-                                    {nineBoxColumnRolesByRow[yIndex][x]}
-                                  </button>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {bucket.map((member) => (
-                                    <div key={member.id} className="flex w-24 flex-col items-center gap-2">
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="inline-flex">
-                                            <MiniAvatar member={member} />
-                                          </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top">
-                                          {formatFio(member.lastName, member.firstName, member.patronymic)}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                      <span className="w-full text-center text-[11px] font-medium leading-tight text-muted-foreground">
-                                        {member.lastName} {member.firstName}
-                                      </span>
-                                    </div>
-                                  ))}
+                                <div className="pt-8" />
+                                <div className="flex flex-wrap gap-3.5">
+                                  {bucket.map((member) => {
+                                    const currentSalaryMarketLevel = getEffectiveSalaryMarketLevel(
+                                      member,
+                                      salaryMarketLevelOverrides
+                                    )
+                                    const category =
+                                      employeeCategoryOverrides[member.id] ??
+                                      getEmployeeCategory(member, currentSalaryMarketLevel)
+                                    const probability =
+                                      resignationProbabilityOverrides[member.id] ??
+                                      getResignationProbability(member, currentSalaryMarketLevel)
+                                    const needsEvaluation =
+                                      category === "not-evaluated" || probability === "not-evaluated"
+
+                                    return (
+                                      <div key={member.id} className="flex w-24 flex-col items-center gap-2.5">
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span className="inline-flex">
+                                              <MiniAvatar member={member} />
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent
+                                            side="top"
+                                            className="max-w-xs bg-popover text-popover-foreground text-sm leading-relaxed"
+                                          >
+                                            <div className="space-y-1">
+                                              <p className="font-medium">
+                                                {formatFio(member.lastName, member.firstName, member.patronymic)}
+                                              </p>
+                                              <p className="text-xs text-muted-foreground">{member.position}</p>
+                                              {needsEvaluation ? (
+                                                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                                  Требуется оценить (категория / вероятность увольнения)
+                                                </p>
+                                              ) : null}
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                        <span className="w-full text-center text-[11px] font-medium leading-tight text-muted-foreground">
+                                          {member.lastName} {member.firstName}
+                                        </span>
+                                      </div>
+                                    )
+                                  })}
                                   {bucket.length === 0 ? (
-                                    <span className="text-xs text-muted-foreground">Нет сотрудников</span>
+                                    <span className="text-base text-muted-foreground">Нет сотрудников</span>
                                   ) : null}
                                 </div>
                               </div>
@@ -1603,10 +3241,16 @@ export default function AssessmentPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="grid gap-1.5">
-                    <div className="grid grid-cols-[48px_repeat(3,minmax(0,1fr))] gap-2 px-1">
+                  <div className="grid gap-3">
+                    <div
+                      className={`grid gap-2 px-1 ${
+                        teamMatrixColumnCount === 4
+                          ? "grid-cols-[48px_repeat(4,minmax(0,1fr))]"
+                          : "grid-cols-[48px_repeat(3,minmax(0,1fr))]"
+                      }`}
+                    >
                       <div />
-                      {nineBoxAxisLabels.x.map((label) => (
+                      {teamMatrixConfig.x.map((label) => (
                         <div
                           key={label}
                           className="text-center text-sm font-semibold tracking-wide text-muted-foreground"
@@ -1615,10 +3259,54 @@ export default function AssessmentPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="grid grid-cols-[48px_repeat(3,minmax(0,1fr))] gap-2 px-1">
+                    <div
+                      className={`grid gap-2 px-1 ${
+                        teamMatrixColumnCount === 4
+                          ? "grid-cols-[48px_repeat(4,minmax(0,1fr))]"
+                          : "grid-cols-[48px_repeat(3,minmax(0,1fr))]"
+                      }`}
+                    >
                       <div />
-                      <div className="col-span-3 text-center text-base font-semibold tracking-wide text-muted-foreground">
-                        {nineBoxAxisLabels.xLabel}
+                      <div
+                        className={`flex items-center justify-center gap-2 text-center text-base font-semibold tracking-wide text-muted-foreground ${
+                          teamMatrixColumnCount === 4 ? "col-span-4" : "col-span-3"
+                        }`}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          strokeWidth="2.2"
+                          stroke="currentColor"
+                          className="text-muted-foreground"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M20 12H4M7 9l-3 3 3 3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        {teamMatrixConfig.xLabel}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          strokeWidth="2.2"
+                          stroke="currentColor"
+                          className="text-muted-foreground"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M4 12h16M17 9l3 3-3 3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
                       </div>
                     </div>
                   </div>
@@ -1631,18 +3319,18 @@ export default function AssessmentPage() {
                 if (!open) setNineBoxCellDetail(null)
               }}
             >
-              <DialogContent className="gap-6">
+              <DialogContent className="gap-7">
                 {nineBoxCellDetail ? (
                   <>
                     <DialogHeader>
                       <DialogTitle>{nineBoxCellDetail.roleLabel}</DialogTitle>
                       <DialogDescription asChild>
                         <p>
-                          Подразделение: {currentUnitLabel}. Производительность:{" "}
+                          Подразделение: {currentUnitLabel}. {teamMatrixConfig.yLabel}:{" "}
                           <span className="text-foreground">
                             {nineBoxCellDetail.perfLabel}
                           </span>
-                          . Потенциал:{" "}
+                          . {teamMatrixConfig.xLabel}:{" "}
                           <span className="text-foreground">
                             {nineBoxCellDetail.potLabel}
                           </span>
@@ -1651,7 +3339,7 @@ export default function AssessmentPage() {
                       </DialogDescription>
                     </DialogHeader>
                     {nineBoxRoleDetail ? (
-                      <div className="space-y-5 text-sm">
+                      <div className="space-y-6 text-sm">
                         <section>
                           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Характеристика группы
@@ -1711,7 +3399,7 @@ export default function AssessmentPage() {
                             Сотрудники в ячейке ({nineBoxDetailStaff.length})
                           </h3>
                           {nineBoxDetailStaff.length === 0 ? (
-                            <p className="text-muted-foreground">Нет сотрудников</p>
+                            <p className="text-base text-muted-foreground">Нет сотрудников</p>
                           ) : (
                             <ul className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2">
                               {nineBoxDetailStaff.map((member) => (
@@ -1733,6 +3421,69 @@ export default function AssessmentPage() {
                     ) : null}
                   </>
                 ) : null}
+              </DialogContent>
+            </Dialog>
+            <Dialog
+              open={isNotebookOpen}
+              onOpenChange={(open) => {
+                if (!open) {
+                  closeStaffNotebook()
+                }
+              }}
+            >
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {notebookStaffMember
+                      ? formatFio(
+                          notebookStaffMember.lastName,
+                          notebookStaffMember.firstName,
+                          notebookStaffMember.patronymic
+                        )
+                      : "сотрудник"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Здесь можно добавить заметку по сотруднику с автоматической меткой времени.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="max-h-56 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
+                    {notebookEntries.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Записей пока нет.</p>
+                    ) : (
+                      notebookEntries.map((entry, index) => (
+                        <div
+                          key={`${entry.createdAt}-${index}`}
+                          className="space-y-1 rounded-md border border-border/70 bg-muted/20 px-3 py-2"
+                        >
+                          <p className="text-xs text-muted-foreground">
+                            {entry.subjectFio}, {entry.createdAt}
+                          </p>
+                          <p className="whitespace-pre-wrap text-sm text-foreground">{entry.text}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <textarea
+                    value={notebookDraft}
+                    onChange={(event) => setNotebookDraft(event.target.value)}
+                    placeholder="Введите комментарий..."
+                    className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
+                    aria-label="Поле комментария в записной книжке"
+                  />
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setNotebookDraft("")}
+                    >
+                      Очистить
+                    </Button>
+                    <Button type="button" onClick={saveStaffNotebookEntry}>
+                      Сохранить комментарий
+                    </Button>
+                  </div>
+                </div>
               </DialogContent>
             </Dialog>
           </section>
