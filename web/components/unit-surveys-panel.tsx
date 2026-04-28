@@ -87,13 +87,15 @@ function formatNowLabel(): string {
   return `${dd}.${mm}.${yy} ${hh}:${mi}`
 }
 
+const DEMO_BASE_ISO_DATE = "2026-04-15T09:00:00.000Z"
+const DEMO_MS_IN_DAY = 24 * 60 * 60 * 1000
+
 function createDemoAssignments(unitOptions: UnitOption[]): SurveyRequest[] {
   if (unitOptions.length === 0 || SURVEY_TEMPLATES.length === 0) return []
   const BASE_DEMO_COUNT = 15
   const EXTRA_DRAFT_DEMO_COUNT = 2
   const DEMO_COUNT = BASE_DEMO_COUNT + EXTRA_DRAFT_DEMO_COUNT
   const demoUnits = unitOptions
-  const now = new Date()
   const statusCycle: UnitSurveyStatus[] = ["draft", "in_progress", "completed"]
   const titlePrefixes = [
     "Диагностический",
@@ -109,9 +111,16 @@ function createDemoAssignments(unitOptions: UnitOption[]): SurveyRequest[] {
   ]
 
   const formatDemoDate = (shiftDays: number) => {
-    const date = new Date(now)
-    date.setDate(now.getDate() + shiftDays)
+    const base = new Date(DEMO_BASE_ISO_DATE)
+    const date = new Date(base.getTime() + shiftDays * DEMO_MS_IN_DAY)
     return date.toISOString().slice(0, 10)
+  }
+
+  const formatDemoCreatedLabel = (index: number) => {
+    const base = new Date(DEMO_BASE_ISO_DATE)
+    const created = new Date(base.getTime() + index * 37 * 60 * 1000)
+    const createdLabelDate = formatDateLabel(created)
+    return `${createdLabelDate}`
   }
 
   return Array.from({ length: DEMO_COUNT }, (_, index) => {
@@ -151,12 +160,7 @@ function createDemoAssignments(unitOptions: UnitOption[]): SurveyRequest[] {
             : endShift > 14
               ? ""
               : formatDemoDate(Math.max(0, endShift)),
-      createdAtLabel: (() => {
-        const created = new Date(now)
-        created.setHours(now.getHours() - (index % 16))
-        created.setMinutes((index * 7) % 60)
-        return `${formatDateLabel(created)}`
-      })(),
+      createdAtLabel: formatDemoCreatedLabel(index),
       title: `${prefix}: ${templateTitle} №${index + 1}`,
       description: template.description,
       participants,
@@ -165,11 +169,11 @@ function createDemoAssignments(unitOptions: UnitOption[]): SurveyRequest[] {
 }
 
 function formatDateLabel(date: Date): string {
-  const dd = String(date.getDate()).padStart(2, "0")
-  const mm = String(date.getMonth() + 1).padStart(2, "0")
-  const yy = date.getFullYear()
-  const hh = String(date.getHours()).padStart(2, "0")
-  const mi = String(date.getMinutes()).padStart(2, "0")
+  const dd = String(date.getUTCDate()).padStart(2, "0")
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0")
+  const yy = date.getUTCFullYear()
+  const hh = String(date.getUTCHours()).padStart(2, "0")
+  const mi = String(date.getUTCMinutes()).padStart(2, "0")
   return `${dd}.${mm}.${yy} ${hh}:${mi}`
 }
 
