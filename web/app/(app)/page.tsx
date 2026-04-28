@@ -36,10 +36,13 @@ import {
   type StaffMember,
 } from "@/lib/bank-org-mock"
 import { getNineBoxRoleProfile } from "@/lib/assessment/nine-box-profiles"
+import psychReportDemo from "@/lib/psych-report-demo.json"
+import type { PsychPersonalReport } from "@/lib/psych-report-types"
 import {
   formatFioMember,
   STAFF_TABLE_PAGE_SIZE_OPTIONS,
 } from "@/lib/staff-presentation"
+import { ExternalAssessmentPersonalReport } from "@/components/external-assessment-personal-report"
 import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -63,6 +66,7 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import {
   ChevronDown,
+  ChevronRight,
   SearchIcon,
   MessageSquare,
   SlidersHorizontalIcon,
@@ -864,6 +868,8 @@ export default function AssessmentPage() {
     null
   )
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
+  const [isExternalAssessmentsModalOpen, setIsExternalAssessmentsModalOpen] =
+    useState(false)
   const [notebookStaffId, setNotebookStaffId] = useState<string | null>(null)
   const [notebookDraft, setNotebookDraft] = useState("")
   const [staffNotebookEntries, setStaffNotebookEntries] = useState<Record<string, StaffNotebookEntry[]>>(
@@ -2623,7 +2629,7 @@ export default function AssessmentPage() {
                 if (!open) setSelectedStaffMember(null)
               }}
             >
-              <DialogContent className="max-h-[90vh] w-[96vw] max-w-6xl gap-0 overflow-hidden p-0">
+              <DialogContent className="max-h-[90vh] w-[96vw] max-w-7xl gap-0 overflow-hidden p-0">
                 {selectedStaffMember ? (
                   <>
                     <DialogTitle className="sr-only">
@@ -3651,6 +3657,34 @@ export default function AssessmentPage() {
               В этом разделе будет отображаться свод внешних оценок и источники
               данных (аудит, обратная связь клиентов, подрядчики и т.п.).
             </p>
+            <button
+              type="button"
+              onClick={() => setIsExternalAssessmentsModalOpen(true)}
+              className="mt-6 flex w-full max-w-xl items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="min-w-0">
+                <span className="block text-sm font-medium text-foreground">
+                  Свод внешних оценок
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Нажмите, чтобы открыть
+                </span>
+              </div>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            </button>
+            <Dialog
+              open={isExternalAssessmentsModalOpen}
+              onOpenChange={setIsExternalAssessmentsModalOpen}
+            >
+              <DialogContent className="max-h-[90vh] w-[96vw] max-w-7xl gap-0 overflow-hidden p-0">
+                <DialogTitle className="sr-only">Персональный отчёт по внешней оценке</DialogTitle>
+                <div className="max-h-[90vh] overflow-y-auto px-6 py-5">
+                  <ExternalAssessmentPersonalReport
+                    data={psychReportDemo as unknown as PsychPersonalReport}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
           </section>
         </TabsContent>
       </Tabs>
