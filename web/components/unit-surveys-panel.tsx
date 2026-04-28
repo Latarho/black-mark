@@ -89,7 +89,9 @@ function formatNowLabel(): string {
 
 function createDemoAssignments(unitOptions: UnitOption[]): SurveyRequest[] {
   if (unitOptions.length === 0 || SURVEY_TEMPLATES.length === 0) return []
-  const DEMO_COUNT = 15
+  const BASE_DEMO_COUNT = 15
+  const EXTRA_DRAFT_DEMO_COUNT = 2
+  const DEMO_COUNT = BASE_DEMO_COUNT + EXTRA_DRAFT_DEMO_COUNT
   const demoUnits = unitOptions
   const now = new Date()
   const statusCycle: UnitSurveyStatus[] = ["draft", "in_progress", "completed"]
@@ -125,12 +127,13 @@ function createDemoAssignments(unitOptions: UnitOption[]): SurveyRequest[] {
     const template = SURVEY_TEMPLATES[index % SURVEY_TEMPLATES.length]
     const templateTitle = template.title
     const prefix = titlePrefixes[index % titlePrefixes.length]
-    const status = statusCycle[index % statusCycle.length]
+    const isExtraDraft = index >= BASE_DEMO_COUNT
+    const status = isExtraDraft ? "draft" : statusCycle[index % statusCycle.length]
     const startShift = (index % 8) * -1
     const endShift = index % 5 === 0 ? index : (index % 6) + 1
 
     return {
-      id: `demo-survey-${unit.id}-${template.id}`,
+      id: `demo-survey-${unit.id}-${template.id}-${index}`,
       unitId: unit.id,
       templateId: template.id,
       status,
@@ -667,7 +670,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
         ) : (
           <>
             {viewMode === "grid" ? (
-              <div className="space-y-5">
+              <div className="space-y-8">
                 {groupedGridAssignments.map((group) => {
                   const statusLabel = UNIT_SURVEY_STATUS_LABELS[group.status]
 
@@ -675,7 +678,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
                     <div
                       key={group.status}
                       className={cn(
-                        "space-y-2 overflow-hidden rounded-xl border border-border/80 shadow-sm",
+                        "space-y-3.5 overflow-hidden rounded-xl border border-border/80 shadow-sm",
                         surveyGroupPanelClass(group.status)
                       )}
                     >
@@ -685,7 +688,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
                         </h3>
                         <span className="text-xs text-muted-foreground">{group.items.length} шт.</span>
                       </div>
-                      <div className="grid grid-cols-5 gap-3 p-3">
+                      <div className="grid grid-cols-5 gap-6 p-5">
                         {group.items.map((a, index) => {
                           const tmpl = templateById.get(a.templateId)
                           const visibleParticipants = a.participants.slice(0, 3)
