@@ -43,6 +43,7 @@ import {
   STAFF_TABLE_PAGE_SIZE_OPTIONS,
 } from "@/lib/staff-presentation"
 import { ExternalAssessmentPersonalReport } from "@/components/external-assessment-personal-report"
+import { UnitSurveysPanel } from "@/components/unit-surveys-panel"
 import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -1520,9 +1521,15 @@ export default function AssessmentPage() {
           </TabsTrigger>
           <TabsTrigger
             value="external"
-            className="h-full rounded-none rounded-r-md border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
+            className="h-full rounded-none border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
           >
             Внешние оценки
+          </TabsTrigger>
+          <TabsTrigger
+            value="surveys"
+            className="h-full rounded-none rounded-r-md border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
+          >
+            Опросы
           </TabsTrigger>
         </TabsList>
         <TabsContent value="mine" className="mt-0 flex flex-1 flex-col" />
@@ -3685,6 +3692,11 @@ export default function AssessmentPage() {
                 </div>
               </DialogContent>
             </Dialog>
+          </section>
+        </TabsContent>
+        <TabsContent value="surveys" className="mt-0 flex min-h-0 flex-1 flex-col">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-card">
+            <UnitSurveysPanel unitOptions={unitOptions} />
           </section>
         </TabsContent>
       </Tabs>
