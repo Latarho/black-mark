@@ -1,6 +1,5 @@
 ﻿"use client"
 
-import type { ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,28 +28,15 @@ import {
 import { collectUnitIds, findUnit, ORG_ROOT, STAFF, type StaffMember } from "@/lib/bank-org-mock"
 import { cn } from "@/lib/utils"
 import { formatFioMember, STAFF_TABLE_PAGE_SIZE_OPTIONS } from "@/lib/staff-presentation"
+import type { UnitOption } from "@/lib/unit-options"
 import { LayoutGrid, List, Plus, Search, SlidersHorizontal, UserPlus, X } from "lucide-react"
 
-type UnitOption = { id: string; path: string }
 type SurveyViewMode = "grid" | "table"
 type CreateSurveyStep = "info" | "participants"
 type SurveyRequest = UnitSurveyAssignment & {
   title: string
   description: string
   participants: string[]
-}
-
-/** Как `ReportDetailSection` в персональном отчёте / карточке сотрудника. */
-function SurveysSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      <div className="flex items-center gap-2.5 border-b border-border bg-muted/35 px-4 py-3.5">
-        <span className="h-5 w-1 shrink-0 rounded-full bg-primary/70" />
-        <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">{title}</h3>
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  )
 }
 
 function statusBadgeClass(status: UnitSurveyStatus) {
@@ -886,7 +872,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
         open={isCreateDialogOpen}
         onOpenChange={(open) => (open ? setIsCreateDialogOpen(true) : closeCreateDialog())}
       >
-        <DialogContent className="max-h-[min(85vh,calc(100vh-2rem))] sm:max-w-3xl">
+        <DialogContent maxWidth="regular" className="max-h-[min(85vh,calc(100vh-2rem))]">
           <DialogHeader>
             <DialogTitle>Создание опроса</DialogTitle>
             <DialogDescription>Мастер из двух шагов для нового запроса в подразделение.</DialogDescription>
@@ -1141,7 +1127,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
         open={isSurveyDetailsOpen}
         onOpenChange={(open) => (open ? setIsSurveyDetailsOpen(true) : closeSurveyDetails())}
       >
-        <DialogContent className="max-h-[min(85vh,calc(100vh-2rem))] sm:max-w-4xl">
+        <DialogContent maxWidth="regular" className="max-h-[min(85vh,calc(100vh-2rem))]">
           <DialogHeader>
             <DialogTitle>Подробности по опросу</DialogTitle>
             <DialogDescription>Просмотр и редактирование параметров запроса</DialogDescription>

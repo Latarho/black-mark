@@ -1,7 +1,7 @@
 "use client"
 
-import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
+import { DetailCardField, DetailCardSection } from "@/components/detail-card-section"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -57,20 +57,10 @@ function colorBadgeVariant(c: PsychCompetenceColor): "default" | "secondary" | "
 
 const STEN_MAX = 9
 
-/** Те же стили заголовка блока, что у `DetailSection` в модалке сотрудника. */
 function ReportDetailSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      <div className="flex items-center gap-2.5 border-b border-border bg-muted/35 px-4 py-3.5">
-        <span className="h-5 w-1 shrink-0 rounded-full bg-primary/70" />
-        <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">{title}</h3>
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  )
+  return <DetailCardSection title={title}>{children}</DetailCardSection>
 }
 
-/** Те же стили поля, что у `DetailItem` в модалке сотрудника. */
 function ReportDetailField({
   label,
   value,
@@ -78,23 +68,9 @@ function ReportDetailField({
 }: {
   label: string
   value: ReactNode
-  icon?: LucideIcon
+  icon?: Parameters<typeof DetailCardField>[0]["icon"]
 }) {
-  return (
-    <div className="min-w-0 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 transition-colors hover:border-primary/40 hover:bg-muted/35">
-      <dt className="text-sm text-muted-foreground">
-        {Icon ? (
-          <span className="flex items-center gap-1.5">
-            <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
-            {label}
-          </span>
-        ) : (
-          label
-        )}
-      </dt>
-      <dd className="mt-1 min-w-0 break-words text-sm leading-snug text-foreground">{value}</dd>
-    </div>
-  )
+  return <DetailCardField label={label} value={value} icon={Icon} />
 }
 
 function TPointScale({

@@ -7,6 +7,14 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
+const dialogMaxWidthBySize = {
+  compact: "max-w-2xl",
+  regular: "sm:max-w-4xl",
+  wide: "max-w-7xl",
+} as const
+
+type DialogContentMaxWidth = keyof typeof dialogMaxWidthBySize
+
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
@@ -48,9 +56,11 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  maxWidth = "compact",
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  maxWidth?: DialogContentMaxWidth
   showCloseButton?: boolean
 }) {
   return (
@@ -59,7 +69,8 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-2xl max-h-[min(90vh,calc(100%-2rem))] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border border-border bg-card p-6 text-sm/relaxed text-card-foreground shadow-lg duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-h-[min(90vh,calc(100%-2rem))] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border border-border bg-card p-6 text-sm/relaxed text-card-foreground shadow-lg duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          dialogMaxWidthBySize[maxWidth],
           className
         )}
         {...props}
