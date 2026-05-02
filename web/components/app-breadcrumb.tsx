@@ -14,22 +14,27 @@ import { getSectionTitleForPathname } from "@/lib/nav-config"
 
 export function AppBreadcrumb() {
   const pathname = usePathname()
+  const isHome = pathname === "/" || pathname === ""
 
   return (
     <Breadcrumb>
       <BreadcrumbList className="text-base/relaxed">
-        <BreadcrumbItem>
-          <Link
-            href="/"
-            className="transition-colors hover:text-foreground"
-          >
-            Главная
-          </Link>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
+        {!isHome ? (
+          <>
+            <BreadcrumbItem>
+              <Link
+                href="/"
+                className="transition-colors hover:text-foreground"
+              >
+                Главная
+              </Link>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+          </>
+        ) : null}
         <BreadcrumbItem>
           <BreadcrumbPage>
-            {getSectionTitleForPathname(pathname)}
+            {isHome ? "Главная" : getSectionTitleForPathname(pathname)}
           </BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>

@@ -24,13 +24,23 @@ export function DetailCardSection({
   title,
   children,
   variant = "default",
+  /** `panel` — как вложенные блоки в «Оценке»: radius lg, без тени. */
+  surface = "elevated",
 }: {
   title: string
   children: ReactNode
   variant?: DetailCardSectionVariant
+  surface?: "elevated" | "panel"
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <section
+      className={cn(
+        "overflow-hidden border border-border bg-card",
+        surface === "panel"
+          ? "rounded-lg shadow-none"
+          : "rounded-xl shadow-sm"
+      )}
+    >
       <div className={sectionHeaderClassByVariant[variant]}>
         <span className={sectionAccentClassByVariant[variant]} />
         <h3 className={sectionTitleClassByVariant[variant]}>{title}</h3>

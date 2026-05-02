@@ -715,6 +715,9 @@ const STAFF_DEMO_POMYTKIN: StaffMember = {
   avatarUrl: "/avatars/pomytkin-sergey.png",
 }
 
+/** Сотрудник, от имени которого показывается демо-сессия (главный экран «Мой профиль»). */
+export const DEMO_SESSION_STAFF_ID = STAFF_DEMO_POMYTKIN.id
+
 export const STAFF: StaffMember[] = [
   ...Object.entries(UNIT_COUNTS).flatMap(([unitId, n]) =>
     makeStaffForUnit(unitId, n)
@@ -796,4 +799,24 @@ export function getStaffLineManagers(
     }
   }
   return out
+}
+
+export function getStaffMemberById(id: string): StaffMember | undefined {
+  return STAFF.find((s) => s.id === id)
+}
+
+/**
+ * Коллеги в том же подразделении, без указанного сотрудника (блок «Моя команда» на главной).
+ * Руководитель подразделения — первым в списке.
+ */
+export function getUnitColleaguesExcludingSelf(member: StaffMember): StaffMember[] {
+  const same = STAFF.filter((s) => s.unitId === member.unitId && s.id !== member.id)
+  return same.sort((a, b) => {
+    const ah = a.isUnitHead ? 1 : 0
+    const bh = b.isUnitHead ? 1 : 0
+    if (bh !== ah) return bh - ah
+    const an = `${a.lastName} ${a.firstName}`.toLocaleLowerCase()
+    const bn = `${b.lastName} ${b.firstName}`.toLocaleLowerCase()
+    return an.localeCompare(bn, "ru")
+  })
 }

@@ -16,6 +16,7 @@ export function StaffMemberAvatar({
   className = "size-9",
   initials,
   fallbackTone = "chart",
+  imgSizes = "96px",
   ...spanProps
 }: {
   member: StaffMember
@@ -23,6 +24,8 @@ export function StaffMemberAvatar({
   initials: "assessment" | "staff"
   /** Без фото: цвета как в матрице/орг-графе или как в крупной карточке (primary). */
   fallbackTone?: "chart" | "primary"
+  /** Подсказка для `next/image` при отображении фото (`fill`). */
+  imgSizes?: string
 } & React.ComponentPropsWithoutRef<"span">) {
   const label = formatFioMember(member)
   const text =
@@ -45,7 +48,7 @@ export function StaffMemberAvatar({
           alt={imgAlt}
           fill
           className="object-cover"
-          sizes="96px"
+          sizes={imgSizes}
         />
       </span>
     )
