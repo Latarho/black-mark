@@ -548,6 +548,53 @@ export function getResignationProbability(
   return member.managerResignationProbability ?? "not-evaluated"
 }
 
+/** Категория по периоду оценки (год); при наличии `managerAssessmentByYear[year]` он приоритетнее базового поля. */
+export function getEmployeeCategoryForCycleYear(
+  member: StaffMember,
+  salaryLevel: SalaryMarketLevel,
+  cycleYear: number,
+  categoryOverrides: Record<string, EmployeeCategoryLevel>
+): EmployeeCategoryLevel {
+  const fromYear = member.managerAssessmentByYear?.[cycleYear]?.category
+  if (fromYear !== undefined) {
+    return categoryOverrides[member.id] ?? fromYear
+  }
+  return categoryOverrides[member.id] ?? getEmployeeCategory(member, salaryLevel)
+}
+
+/** Вероятность увольнения по периоду оценки (год). */
+export function getResignationProbabilityForCycleYear(
+  member: StaffMember,
+  salaryLevel: SalaryMarketLevel,
+  cycleYear: number,
+  probabilityOverrides: Record<string, ResignationProbabilityLevel>
+): ResignationProbabilityLevel {
+  const fromYear = member.managerAssessmentByYear?.[cycleYear]?.probability
+  if (fromYear !== undefined) {
+    return probabilityOverrides[member.id] ?? fromYear
+  }
+  return probabilityOverrides[member.id] ?? getResignationProbability(member, salaryLevel)
+}
+
+/** Результат оценки (A–E) с учётом периода оценки (год) и тех же overrides, что на странице «Оценка». */
+export function getAssessmentGradeForMemberAndYear(
+  member: StaffMember,
+  salaryOverrides: Record<string, SalaryMarketLevel>,
+  categoryOverrides: Record<string, EmployeeCategoryLevel>,
+  probabilityOverrides: Record<string, ResignationProbabilityLevel>,
+  cycleYear: number
+): AssessmentGradeLevel {
+  const salaryLevel = getEffectiveSalaryMarketLevel(member, salaryOverrides)
+  const category = getEmployeeCategoryForCycleYear(member, salaryLevel, cycleYear, categoryOverrides)
+  const probability = getResignationProbabilityForCycleYear(
+    member,
+    salaryLevel,
+    cycleYear,
+    probabilityOverrides
+  )
+  return getAssessmentGrade(category, probability)
+}
+
 const EMPLOYEE_CATEGORY_TO_INDEX: Record<EmployeeCategoryLevel, number> = {
   ineffective: 0,
   "second-chance": 1,

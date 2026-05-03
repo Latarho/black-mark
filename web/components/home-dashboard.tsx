@@ -14,9 +14,9 @@ import {
   UserRoundSearchIcon,
 } from "lucide-react"
 
-import { DetailCardSection } from "@/components/detail-card-section"
 import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { HomeTeamAssessment } from "@/components/home-team-assessment"
 import type { StaffMember } from "@/lib/bank-org-mock"
 import { formatFioMember, unitHeadTagClass } from "@/lib/staff-presentation"
 import { cn } from "@/lib/utils"
@@ -38,7 +38,7 @@ export type HomeOrgProfile = {
 function ProfileAttrRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
       <div className="mt-0.5 min-w-0 break-words text-sm leading-snug text-foreground">{children}</div>
@@ -108,7 +108,7 @@ export function HomeDashboard({
           <TabsContent value="profile" className="mt-0 min-h-0 w-full min-w-0 flex-1 text-left">
             <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-4">
               <aside className="min-w-0 rounded-lg border border-border bg-card px-3 py-3 lg:col-span-1">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Профиль
                 </p>
                 <div className="mt-2 space-y-2 text-sm">
@@ -125,7 +125,7 @@ export function HomeDashboard({
                 </div>
 
                 <div className="mt-3 border-t border-border pt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                     Контакты
                   </p>
                   <div className="mt-2 space-y-2 text-sm">
@@ -148,7 +148,7 @@ export function HomeDashboard({
                 </div>
 
                 <div className="mt-3 border-t border-border pt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                     Руководители
                   </p>
                   {orgProfile.managers.length > 0 ? (
@@ -164,7 +164,7 @@ export function HomeDashboard({
                             <p className="truncate text-sm font-medium leading-tight text-foreground">
                               {formatFioMember(m)}
                             </p>
-                            <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
+                            <p className="mt-0.5 truncate text-sm leading-tight text-muted-foreground">
                               {m.position}
                             </p>
                           </div>
@@ -197,12 +197,12 @@ export function HomeDashboard({
                                 </span>
                                 <div className="min-w-0 flex-1">
                                   <span className="block font-medium text-foreground">{label}</span>
-                                  <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                                  <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
                                     {description}
                                   </span>
                                 </div>
                               </div>
-                              <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-primary">
+                              <span className="shrink-0 text-sm font-semibold uppercase tracking-wide text-primary">
                                 Перейти
                               </span>
                             </Link>
@@ -217,43 +217,7 @@ export function HomeDashboard({
           </TabsContent>
 
           <TabsContent value="team" className="mt-0 min-h-0 w-full min-w-0 flex-1 text-left">
-            <DetailCardSection title="Моя команда" variant="compact" surface="panel">
-              <p className="mb-3 text-xs text-muted-foreground">
-                Коллеги в вашем подразделении — всего {team.length}
-              </p>
-              <ul className="max-h-[min(26rem,50vh)] space-y-2 overflow-y-auto overscroll-contain pr-1">
-                {team.map((member) => (
-                  <li
-                    key={member.id}
-                    className="flex items-center gap-3 rounded-md border border-border bg-muted/20 px-2 py-2 transition-colors hover:bg-muted/40"
-                  >
-                    <StaffMemberAvatar
-                      member={member}
-                      initials="staff"
-                      className="size-10 text-sm"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {formatFioMember(member)}
-                        </span>
-                        {member.isUnitHead ? (
-                          <span className={cn("shrink-0", unitHeadTagClass)}>Руководитель</span>
-                        ) : null}
-                      </div>
-                      <p className="truncate text-xs text-muted-foreground">{member.position}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/cabinet/staff"
-                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
-              >
-                <NetworkIcon className="size-4" aria-hidden />
-                Организационная структура
-              </Link>
-            </DetailCardSection>
+            <HomeTeamAssessment team={team} />
           </TabsContent>
         </Tabs>
       </section>

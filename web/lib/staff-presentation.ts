@@ -9,7 +9,7 @@ export const STAFF_TONE_CLASSES = [
   "bg-chart-5/15 text-chart-5",
 ] as const
 
-export const STAFF_TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+export const STAFF_TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
 
 export const sspVspTagClass =
   "inline-flex shrink-0 items-center rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-px text-sm font-semibold uppercase leading-none text-sky-700 dark:border-sky-500/45 dark:bg-sky-500/15 dark:text-sky-300"

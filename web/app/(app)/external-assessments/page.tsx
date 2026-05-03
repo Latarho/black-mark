@@ -29,7 +29,7 @@ export default function ExternalAssessmentsPage() {
         >
           <div className="min-w-0">
             <span className="block text-sm font-medium text-foreground">Свод внешних оценок</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">Нажмите, чтобы открыть</span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">Нажмите, чтобы открыть</span>
           </div>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         </button>

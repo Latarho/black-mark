@@ -16,7 +16,7 @@ const sectionAccentClassByVariant: Record<DetailCardSectionVariant, string> = {
 }
 
 const sectionTitleClassByVariant: Record<DetailCardSectionVariant, string> = {
-  compact: "text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+  compact: "text-sm font-semibold uppercase tracking-wide text-muted-foreground",
   default: "text-sm font-bold uppercase tracking-wide text-foreground",
 }
 
@@ -79,7 +79,7 @@ export function DetailCardField({
         {value}
       </dd>
       {insight ? (
-        <div className="mt-2 text-xs leading-snug text-muted-foreground">{insight}</div>
+        <div className="mt-2 text-sm leading-snug text-muted-foreground">{insight}</div>
       ) : null}
     </div>
   )

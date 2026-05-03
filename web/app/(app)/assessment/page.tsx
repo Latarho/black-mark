@@ -40,6 +40,9 @@ import {
   STAFF_TABLE_PAGE_SIZE_OPTIONS,
 } from "@/lib/staff-presentation"
 import { StaffMemberAvatar } from "@/components/staff-member-avatar"
+import { StaffAssessmentDetailModal } from "@/components/assessment/staff-assessment-detail-modal"
+import { AssessmentGradeSummary } from "@/components/assessment/assessment-grade-summary"
+import { StructuredTooltipContent } from "@/components/assessment/structured-tooltip-content"
 import { DetailCardField, DetailCardSection } from "@/components/detail-card-section"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -64,12 +67,12 @@ import { cn } from "@/lib/utils"
 import {
   ChevronDown,
   SearchIcon,
-  MessageSquare,
   SlidersHorizontalIcon,
   XIcon,
   Users,
 } from "lucide-react"
-import { useMemo, useState, type ReactNode } from "react"
+import { useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react"
 import {
   ASSESSMENT_GRADE_HINTS,
   ASSESSMENT_SELECT_CONTENT_CLASS,
@@ -84,15 +87,11 @@ import {
   FKR_STATUS_FILTER_OPTIONS,
   FKR_STATUS_LABELS,
   FKR_TABLE_TAG_CLASS,
-  FULL_TABLE_COL_WIDTHS_PCT,
   OVERTIME_FILTER_OPTIONS,
   RESIGNATION_PROBABILITY_OPTIONS,
   RHYTHM_FILTER_OPTIONS,
-  SALARY_MARKET_LEVEL_CLASSES,
   SALARY_MARKET_LEVEL_LABELS,
   SALARY_MARKET_LEVEL_OPTIONS,
-  SALARY_MARKET_TABLE_TAG_MAX_CH,
-  SHORT_TABLE_COL_WIDTHS_PCT,
   SURVEY_CATEGORY_CLASSES,
   SURVEY_CATEGORY_LABELS,
   SURVEY_CATEGORY_OPTIONS,
@@ -127,112 +126,20 @@ import {
   type TeamMatrixMode,
 } from "@/lib/assessment-model"
 import { collectUnitOptions, getSelectedUnitsLabel } from "@/lib/unit-options"
+import { TeamAssessmentStaffTable } from "@/components/assessment/team-assessment-staff-table"
 
-function SalaryMarketLevelTableTag({ level }: { level: SalaryMarketLevel }) {
-  const full = SALARY_MARKET_LEVEL_LABELS[level]
-  const ref = SALARY_MARKET_LEVEL_LABELS["below-median"]
-  const base = cn(
-    "inline-flex min-w-0 max-w-full rounded-full px-2 py-1",
-    TABLE_TAG_TEXT_CLASS,
-    SALARY_MARKET_LEVEL_CLASSES[level]
-  )
-  if (full.length > ref.length) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className={cn(base, "cursor-default")}>
-            <span
-              className="min-w-0 truncate"
-              style={{ maxWidth: `${SALARY_MARKET_TABLE_TAG_MAX_CH}ch` }}
-            >
-              {full}
-            </span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-sm uppercase">
-          {full}
-        </TooltipContent>
-      </Tooltip>
-    )
-  }
-  return <span className={base}>{full}</span>
-}
-
-function DetailSection({
-  title,
-  children,
+function AssessmentTabQuerySync({
+  setTab,
 }: {
-  title: string
-  children: ReactNode
+  setTab: (value: "mine" | "team") => void
 }) {
-  return (
-    <DetailCardSection title={title} variant="compact">
-      {children}
-    </DetailCardSection>
-  )
-}
-
-function DetailItem({
-  label,
-  value,
-  insight,
-}: {
-  label: string
-  value: ReactNode
-  insight?: ReactNode
-}) {
-  return (
-    <DetailCardField
-      label={label}
-      value={value}
-      insight={insight}
-      labelClassName="text-xs"
-    />
-  )
-}
-
-function StructuredTooltipContent({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children?: ReactNode
-}) {
-  return (
-    <TooltipContent className="max-w-sm bg-popover p-3 text-popover-foreground text-sm leading-relaxed">
-      <div className="space-y-1.5">
-        <p className="font-semibold text-foreground">{title}</p>
-        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
-        {children ? <div className="space-y-1 text-sm text-muted-foreground">{children}</div> : null}
-      </div>
-    </TooltipContent>
-  )
-}
-
-function DetailTag({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className: string
-}) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} ${className}`}>
-      {children}
-    </span>
-  )
-}
-
-function CriticalityTag({ level }: { level: AssessmentGradeLevel }) {
-  return (
-    <span
-      className={`inline-flex min-h-7 items-center rounded-full border px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${CRITICALITY_LEVEL_CLASSES[level]}`}
-    >
-      {CRITICALITY_LEVEL_LABELS[level]}
-    </span>
-  )
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const t = searchParams.get("tab")
+    if (t === "team") setTab("team")
+    else if (t === "mine") setTab("mine")
+  }, [searchParams, setTab])
+  return null
 }
 
 function MiniAvatar({ member }: { member: StaffMember }) {
@@ -246,6 +153,8 @@ function MiniAvatar({ member }: { member: StaffMember }) {
 }
 
 export default function AssessmentPage() {
+  const [assessmentTab, setAssessmentTab] = useState<"mine" | "team">("mine")
+
   const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([])
   const [staffSearchQuery, setStaffSearchQuery] = useState("")
   const [fioFilterQuery, setFioFilterQuery] = useState("")
@@ -960,7 +869,14 @@ export default function AssessmentPage() {
   const isFullTableView = tableViewMode === "full"
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pt-4">
-      <Tabs defaultValue="mine" className="flex w-full flex-1 flex-col gap-4">
+      <Suspense fallback={null}>
+        <AssessmentTabQuerySync setTab={setAssessmentTab} />
+      </Suspense>
+      <Tabs
+        value={assessmentTab}
+        onValueChange={(value) => setAssessmentTab(value as "mine" | "team")}
+        className="flex w-full flex-1 flex-col gap-4"
+      >
         <TabsList className="group-data-horizontal/tabs:h-8 flex h-8 w-full overflow-hidden rounded-lg border border-border bg-muted p-px divide-x divide-border">
           <TabsTrigger
             value="mine"
@@ -1336,88 +1252,14 @@ export default function AssessmentPage() {
                 ))}
               </div>
             ) : null}
-            <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-              <span className="text-sm font-medium text-muted-foreground">Результат оценки:</span>
-              <span className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-2.5 py-1 text-sm text-foreground">
-                <Users size={14} className="text-foreground/80" />
-                <span className="text-muted-foreground">Сотрудников:</span>
-                <span className="inline-flex min-w-6 justify-center rounded-full border border-border bg-background px-2 py-0.5 font-semibold uppercase">
-                  {filteredStaffForGradeSummary.length}
-                </span>
-              </span>
-              {(["A", "B", "C", "D", "E"] as const).map((grade) => (
-                <Tooltip key={grade}>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => handleAssessmentBadgeFilter(grade)}
-                      className={`inline-flex min-w-0 items-center gap-2 rounded-lg border px-2 py-1 transition-colors hover:bg-muted/30 ${
-                        criticalityFilters.length === 1 && criticalityFilters[0] === grade
-                          ? "border-foreground/60 bg-muted/40"
-                          : "border-border bg-muted/20"
-                      }`}
-                    >
-                      <span
-                        className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full border px-2 text-sm font-semibold uppercase ${CRITICALITY_LEVEL_CLASSES[grade]}`}
-                      >
-                        {grade}
-                      </span>
-                      <span className="inline-flex h-6 min-w-12 items-center justify-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-sm font-semibold uppercase text-foreground">
-                        <span>{assessmentGradeDistribution[grade]}</span>
-                        <span className="text-xs font-medium text-muted-foreground">
-                          ({getAssessmentSummaryPercent(assessmentGradeDistribution[grade])}%)
-                        </span>
-                      </span>
-                    </button>
-                  </TooltipTrigger>
-                  <StructuredTooltipContent
-                    title="Результат оценки"
-                    description="Текущая рекомендации по удержанию:"
-                  >
-                    <p className="text-sm text-muted-foreground">{ASSESSMENT_GRADE_HINTS[grade]}</p>
-                  </StructuredTooltipContent>
-                </Tooltip>
-              ))}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleNotFormedCriticalityFilter}
-                    className={`inline-flex min-w-0 items-center gap-2 rounded-lg border px-2 py-1 transition-colors hover:bg-muted/30 ${
-                      showNotFormedCriticalityFilter
-                        ? "border-foreground/60 bg-muted/40"
-                        : "border-border bg-muted/20"
-                    }`}
-                  >
-                    <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/60 bg-muted/40 px-2 text-sm font-semibold uppercase text-muted-foreground">
-                      Не сформирован
-                    </span>
-                    <span className="inline-flex h-6 min-w-12 items-center justify-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-sm font-semibold uppercase text-foreground">
-                      <span>{assessmentGradeDistribution["not-formed"]}</span>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        ({getAssessmentSummaryPercent(assessmentGradeDistribution["not-formed"])}%)
-                      </span>
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <StructuredTooltipContent title="Результат оценки не сформирован">
-                  <p className="text-sm text-muted-foreground">Для формирования результата оценки заполните:</p>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li className="inline-flex w-full items-start gap-2">
-                      <span className="mt-1.5 inline-flex size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-                      <span>Категория сотрудника</span>
-                    </li>
-                    <li className="inline-flex w-full items-start gap-2">
-                      <span className="mt-1.5 inline-flex size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-                      <span>Вероятность увольнения</span>
-                    </li>
-                  </ul>
-                  <p className="text-sm text-muted-foreground">
-                    После выбора значений оценка пересчитывается автоматически.
-                  </p>
-                </StructuredTooltipContent>
-              </Tooltip>
-            </div>
+            <AssessmentGradeSummary
+              filteredStaffCount={filteredStaffForGradeSummary.length}
+              criticalityFilters={criticalityFilters}
+              assessmentGradeDistribution={assessmentGradeDistribution}
+              showNotFormedCriticalityFilter={showNotFormedCriticalityFilter}
+              onGradeClick={handleAssessmentBadgeFilter}
+              onNotFormedClick={handleNotFormedCriticalityFilter}
+            />
             <Dialog open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
               <DialogContent
                 maxWidth="wide"
@@ -1836,860 +1678,43 @@ export default function AssessmentPage() {
                 </div>
               </DialogContent>
             </Dialog>
-            <div className="min-h-0 flex-1 overflow-auto">
-              <table
-                className={`w-full table-fixed border-collapse text-left text-sm ${
-                  isFullTableView ? "min-w-[1460px]" : "min-w-[980px]"
-                }`}
-              >
-                <colgroup>
-                  {(isFullTableView
-                    ? [...FULL_TABLE_COL_WIDTHS_PCT]
-                    : [...SHORT_TABLE_COL_WIDTHS_PCT]
-                  ).map((pct, i) => (
-                    <col key={i} style={{ width: `${pct}%` }} />
-                  ))}
-                </colgroup>
-                <thead className="sticky top-0 z-10 border-b border-border bg-muted/80 backdrop-blur-sm">
-                  <tr className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                    <th className="px-2 py-2 font-medium">ФИО</th>
-                    <th className="border-l border-border bg-muted/40 px-2 py-2 text-center font-medium text-foreground">
-                      Результат оценки
-                    </th>
-                    <th className="px-2 py-2 font-medium">Категория сотрудника</th>
-                    <th className="px-2 py-2 font-medium">Вероятность увольнения</th>
-                    {isFullTableView ? (
-                      <>
-                        <th className="px-2 py-2 font-medium">Опрос результат</th>
-                        <th className="px-2 py-2 font-medium">Опрос команда</th>
-                        <th className="px-2 py-2 font-medium">ФКР</th>
-                        <th className="px-2 py-2 font-medium">З/П к рынку</th>
-                        <th className="px-2 py-2 font-medium">Переработки</th>
-                        <th className="px-2 py-2 font-medium">РИТМ</th>
-                        <th className="px-2 py-2 font-medium">Внешняя оценка</th>
-                      </>
-                    ) : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedStaff.map((s) => {
-                    const unitPath = getBreadcrumb(ORG_ROOT, s.unitId)
-                      .filter((u) => u.id !== ORG_ROOT.id)
-                      .map((u) => u.name)
-                      .join(" / ")
-                    const currentSalaryMarketLevel =
-                      salaryMarketLevelOverrides[s.id] ??
-                      s.salaryMarketLevel ??
-                      "not-selected"
-                    const currentFkrStatus = s.fkrStatus ?? "not-included"
-                    const currentSurveyResultCategory = s.surveyResultCategory ?? "middle"
-                    const currentSurveyInteractionCategory = s.surveyInteractionCategory ?? "middle"
-                    const employeeCategory =
-                      employeeCategoryOverrides[s.id] ??
-                      getEmployeeCategory(s, currentSalaryMarketLevel)
-                    const resignationProbability =
-                      resignationProbabilityOverrides[s.id] ??
-                      getResignationProbability(s, currentSalaryMarketLevel)
-                    const selectedResignationOption = RESIGNATION_PROBABILITY_OPTIONS.find(
-                      (o) => o.value === resignationProbability
-                    )
-                    const { isFormed: isGradeFormed, missingFields } = hasRequiredAssessment(
-                      employeeCategory,
-                      resignationProbability
-                    )
-                    const assessmentGrade = getAssessmentGrade(employeeCategory, resignationProbability)
-                    const hasNotebookComment = (staffNotebookEntries[s.id] ?? []).length > 0
-                    return (
-                      <tr key={s.id} className="border-b border-border/80 hover:bg-muted/40">
-                        <td className="min-w-0 px-2 py-2 align-middle">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <StaffMemberAvatar
-                              member={s}
-                              className="h-12 w-12 text-sm"
-                              initials="assessment"
-                              fallbackTone="primary"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="mb-0.5 flex min-w-0 items-center gap-1">
-                                <button
-                                  type="button"
-                                  className="block max-w-full truncate text-left text-base font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  onClick={() => setSelectedStaffMember(s)}
-                                >
-                                  {formatFioMember(s)}
-                                </button>
-                              </div>
-                              <p className="mt-0.5 line-clamp-1 break-words leading-snug text-muted-foreground">
-                                {s.position}
-                              </p>
-                              <p className="mt-0.5 line-clamp-1 break-words text-xs leading-snug text-muted-foreground">
-                                {unitPath}
-                              </p>
-                            </div>
-                            <div className="ml-2 flex h-full flex-col justify-center">
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className={`h-12 w-12 rounded-full p-0 transition ${
-                                  hasNotebookComment
-                                    ? "text-emerald-700 hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                    : "text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-400"
-                                }`}
-                                aria-label={`Открыть записную книжку ${formatFioMember(s)}`}
-                                onClick={(event) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  openStaffNotebook(s)
-                                }}
-                              >
-                <MessageSquare className="h-16 w-16" strokeWidth={hasNotebookComment ? 4.5 : 2.5} />
-                              </Button>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="min-w-0 border-l border-border bg-muted/20 px-2 py-2 text-center align-middle">
-                          {isGradeFormed ? (
-                            ASSESSMENT_GRADE_HINTS[assessmentGrade] ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    className={`inline-flex min-h-7 min-w-9 items-center justify-center rounded-full border text-sm font-semibold uppercase ${CRITICALITY_LEVEL_CLASSES[assessmentGrade]}`}
-                                  >
-                                    {CRITICALITY_LEVEL_LABELS[assessmentGrade]}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-sm bg-popover text-popover-foreground text-sm leading-relaxed">
-                                <div className="space-y-2">
-                                    <p className="font-semibold">Результат оценки</p>
-                                  <p className="text-sm text-muted-foreground">Текущая рекомендации по удержанию:</p>
-                                  <p className="text-sm text-muted-foreground">{ASSESSMENT_GRADE_HINTS[assessmentGrade]}</p>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            ) : (
-                              <span
-                                className={`inline-flex min-h-7 min-w-9 items-center justify-center rounded-full border text-sm font-semibold uppercase ${CRITICALITY_LEVEL_CLASSES[assessmentGrade]}`}
-                              >
-                                {CRITICALITY_LEVEL_LABELS[assessmentGrade]}
-                              </span>
-                            )
-                          ) : (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-flex min-h-7 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 bg-muted/30 px-2 py-1 text-sm font-semibold uppercase text-muted-foreground">
-                                  НЕ СФОРМИРОВАН
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-sm bg-popover text-popover-foreground text-sm leading-relaxed">
-                                <div className="space-y-2">
-                                  <p className="font-semibold">Результат оценки не сформирован</p>
-                                  <p className="text-sm text-muted-foreground">Для формирования результата оценки заполните:</p>
-                                  <ul className="space-y-1 text-sm text-muted-foreground">
-                                    {missingFields.map((item) => (
-                                      <li
-                                        key={item}
-                                        className="inline-flex w-full items-start gap-2"
-                                      >
-                                        <span className="mt-1.5 inline-flex size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-                                        <span>{item}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                  <p className="text-sm text-muted-foreground">
-                                    После выбора значений оценка пересчитывается автоматически.
-                                  </p>
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </td>
-                        <td className="min-w-0 px-2 py-2 align-middle">
-                          <Select
-                            value={employeeCategory}
-                            onValueChange={(next) => {
-                              setEmployeeCategoryOverrides((prev) => ({
-                                ...prev,
-                                [s.id]: next as EmployeeCategoryLevel,
-                              }))
-                            }}
-                          >
-                            <SelectTrigger
-                              aria-label={`Категория сотрудника ${formatFioMember(s)}`}
-                              className={ASSESSMENT_SELECT_TRIGGER_CLASS}
-                            >
-                              <SelectValue>
-                                {EMPLOYEE_CATEGORY_OPTIONS.find(
-                                  (o) => o.value === employeeCategory
-                                )?.label ?? employeeCategory}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent
-                              position="popper"
-                              align="start"
-                              className={ASSESSMENT_SELECT_CONTENT_CLASS}
-                            >
-                              {EMPLOYEE_CATEGORY_OPTIONS.map((option) => (
-                                <SelectItem
-                                  key={option.value}
-                                  value={option.value}
-                                  textValue={option.label}
-                                  className="min-h-8 py-1.5 pr-8 text-sm"
-                                >
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="min-w-0 px-2 py-2 align-middle">
-                          <Select
-                            value={resignationProbability}
-                            onValueChange={(next) => {
-                              setResignationProbabilityOverrides((prev) => ({
-                                ...prev,
-                                [s.id]: next as ResignationProbabilityLevel,
-                              }))
-                            }}
-                          >
-                            <SelectTrigger
-                              aria-label={`Вероятность увольнения ${formatFioMember(s)}`}
-                              className={ASSESSMENT_SELECT_TRIGGER_CLASS}
-                            >
-                              <SelectValue>
-                                <span className="flex w-full min-w-0 max-w-full items-center gap-1.5">
-                                  <span className="min-w-0 flex-1 truncate text-left">
-                                    {selectedResignationOption?.label ?? resignationProbability}
-                                  </span>
-                                  {selectedResignationOption?.aiBased ? (
-                                    <Badge
-                                      variant="secondary"
-                                      className="shrink-0 text-sm font-normal"
-                                    >
-                                      На основе ИИ
-                                    </Badge>
-                                  ) : null}
-                                </span>
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent
-                              position="popper"
-                              align="start"
-                              className={ASSESSMENT_SELECT_CONTENT_CLASS}
-                            >
-                              {RESIGNATION_PROBABILITY_OPTIONS.map((option) => (
-                                <SelectItem
-                                  key={option.value}
-                                  value={option.value}
-                                  textValue={option.label}
-                                  className="min-h-8 py-1.5 pr-8 text-sm"
-                                >
-                                  <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                                    <span className="min-w-0 truncate">
-                                      {option.label}
-                                    </span>
-                                    {option.aiBased ? (
-                                      <Badge
-                                        variant="secondary"
-                                        className="shrink-0 text-sm font-normal"
-                                      >
-                                        На основе ИИ
-                                      </Badge>
-                                    ) : null}
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        {isFullTableView ? (
-                          <>
-                            <td className="min-w-0 px-2 py-2 text-center align-middle">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${SURVEY_CATEGORY_CLASSES[currentSurveyResultCategory]}`}
-                              >
-                                {SURVEY_CATEGORY_LABELS[currentSurveyResultCategory]}
-                              </span>
-                            </td>
-                            <td className="min-w-0 px-2 py-2 text-center align-middle">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${SURVEY_CATEGORY_CLASSES[currentSurveyInteractionCategory]}`}
-                              >
-                                {SURVEY_CATEGORY_LABELS[currentSurveyInteractionCategory]}
-                              </span>
-                            </td>
-                            <td className="min-w-0 px-2 py-2 align-middle">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-1 ${TABLE_TAG_TEXT_CLASS} ${FKR_TABLE_TAG_CLASS}`}
-                              >
-                                {FKR_STATUS_LABELS[currentFkrStatus]}
-                              </span>
-                            </td>
-                            <td className="min-w-0 px-2 py-2 align-middle">
-                              <SalaryMarketLevelTableTag level={currentSalaryMarketLevel} />
-                            </td>
-                            <td className="min-w-0 px-2 py-2 text-center align-middle text-muted-foreground">
-                              {(s.overtimeHoursLastMonth ?? 0) > 0 &&
-                              typeof s.overtimeHoursLastMonth === "number" ? (
-                                <span
-                                  className={`inline-flex rounded-full bg-emerald-100 px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200`}
-                                >
-                                  ДА
-                                </span>
-                              ) : (
-                                <span
-                                  className={`inline-flex rounded-full bg-muted px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-muted-foreground`}
-                                >
-                                  НЕТ
-                                </span>
-                              )}
-                            </td>
-                            <td className="min-w-0 px-2 py-2 text-center align-middle text-muted-foreground">
-                              {s.rhythmAssessmentResult === undefined ? (
-                                "—"
-                              ) : s.rhythmAssessmentResult >= 4 ? (
-                                <span
-                                  className={`inline-flex rounded-full bg-emerald-100 px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200`}
-                                >
-                                  ДА
-                                </span>
-                              ) : (
-                                <span
-                                  className={`inline-flex rounded-full bg-muted px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-muted-foreground`}
-                                >
-                                  НЕТ
-                                </span>
-                              )}
-                            </td>
-                            <td className="min-w-0 px-2 py-2 text-center align-middle text-muted-foreground">
-                              {s.externalAssessmentResult === undefined ? (
-                                "—"
-                              ) : s.externalAssessmentResult >= 4 ? (
-                                <span
-                                  className={`inline-flex rounded-full bg-emerald-100 px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200`}
-                                >
-                                  ДА
-                                </span>
-                              ) : (
-                                <span
-                                  className={`inline-flex rounded-full bg-muted px-2 py-0.5 ${TABLE_TAG_TEXT_CLASS} text-muted-foreground`}
-                                >
-                                  НЕТ
-                                </span>
-                              )}
-                            </td>
-                          </>
-                        ) : null}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {totalStaffItems > 0 ? (
-                <div className="flex items-center justify-between border-t border-border px-3 py-2 text-sm">
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <span>Всего: {totalStaffItems}</span>
-                    <label className="flex items-center gap-1.5">
-                      <span>Строк:</span>
-                      <select
-                        className="h-7 rounded-md border border-input bg-background px-2 text-sm text-foreground"
-                        value={staffPageSize}
-                        onChange={(event) => {
-                          setStaffPageSize(Number(event.target.value))
-                          setStaffPage(1)
-                        }}
-                      >
-                        {STAFF_TABLE_PAGE_SIZE_OPTIONS.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2 text-sm"
-                      onClick={() => setStaffPage((p) => Math.max(1, p - 1))}
-                      disabled={safeStaffPage <= 1}
-                    >
-                      Назад
-                    </Button>
-                    <span className="tabular-nums text-muted-foreground">
-                      {safeStaffPage} / {staffPages}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2 text-sm"
-                      onClick={() => setStaffPage((p) => Math.min(staffPages, p + 1))}
-                      disabled={safeStaffPage >= staffPages}
-                    >
-                      Вперёд
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            <Dialog
-              open={selectedStaffMember !== null}
-              onOpenChange={(open) => {
-                if (!open) setSelectedStaffMember(null)
+            <TeamAssessmentStaffTable
+              pagedStaff={pagedStaff}
+              isFullTableView={isFullTableView}
+              salaryMarketLevelOverrides={salaryMarketLevelOverrides}
+              employeeCategoryOverrides={employeeCategoryOverrides}
+              resignationProbabilityOverrides={resignationProbabilityOverrides}
+              staffNotebookEntries={staffNotebookEntries}
+              onEmployeeCategoryChange={(staffId, value) => {
+                setEmployeeCategoryOverrides((prev) => ({ ...prev, [staffId]: value }))
               }}
-            >
-              <DialogContent maxWidth="wide" className="max-h-[90vh] gap-0 overflow-hidden p-0">
-                {selectedStaffMember ? (
-                  <>
-                    <DialogTitle className="sr-only">
-                      {formatFioMember(selectedStaffMember)}
-                    </DialogTitle>
-                    <div className="max-h-[90vh] overflow-y-auto px-6 py-5">
-                      <div className="flex flex-col gap-5">
-                        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-                          <div className="rounded-xl border border-border bg-card px-4 py-5 shadow-sm">
-                            <div className="flex min-h-[200px] min-w-0 items-center gap-4">
-                              <div className="flex w-36 shrink-0 items-center justify-center">
-                                <StaffMemberAvatar
-                                  member={selectedStaffMember}
-                                  className="size-32 text-3xl"
-                                  initials="assessment"
-                                  fallbackTone="primary"
-                                />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-lg font-semibold text-foreground">
-                                  {formatFioMember(selectedStaffMember)}
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                  {selectedStaffMember.position}
-                                </p>
-                                <div className="mt-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 transition-colors hover:border-primary/40 hover:bg-muted/35">
-                                  <p className="text-xs text-muted-foreground">Подразделение</p>
-                                  <p className="mt-1 text-sm leading-snug text-foreground">
-                                    {selectedStaffUnitPath || "Подразделение не указано"}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex min-h-[200px] w-full max-w-sm items-center">
-                            <Carousel
-                              className="w-full px-7"
-                              opts={{ align: "center", loop: false }}
-                            >
-                              <CarouselContent>
-                                <CarouselItem>
-                                  <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                                      Результат оценки
-                                    </p>
-                                    <p className="text-[10px] font-medium uppercase tracking-wide text-primary">
-                                      Текущий · 2026
-                                    </p>
-                                    <span
-                                      className={cn(
-                                        "text-[clamp(3.5rem,10vw+2.5rem,6.5rem)] font-black leading-none tracking-tight",
-                                        CRITICALITY_LETTER_TEXT_CLASSES[selectedStaffCriticality]
-                                      )}
-                                      role="img"
-                                      aria-label={`Результат оценки: ${CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}`}
-                                    >
-                                      {CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}
-                                    </span>
-                                  </div>
-                                </CarouselItem>
-                                <CarouselItem>
-                                  <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                                      Результат оценки
-                                    </p>
-                                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                      2025
-                                    </p>
-                                    <span
-                                      className={cn(
-                                        "text-[clamp(3.5rem,10vw+2.5rem,6.5rem)] font-black leading-none tracking-tight",
-                                        CRITICALITY_LETTER_TEXT_CLASSES[selectedStaffCriticality]
-                                      )}
-                                      role="img"
-                                      aria-label={`Результат оценки за 2025 год: ${CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}`}
-                                    >
-                                      {CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}
-                                    </span>
-                                  </div>
-                                </CarouselItem>
-                              </CarouselContent>
-                              <CarouselPrevious
-                                className="left-0"
-                                variant="outline"
-                                size="icon-sm"
-                              />
-                              <CarouselNext
-                                className="right-0"
-                                variant="outline"
-                                size="icon-sm"
-                              />
-                            </Carousel>
-                          </div>
-                        </div>
-
-                        <Tabs defaultValue="staff-profile" className="flex min-w-0 flex-col gap-4">
-                          <TabsList className="h-auto w-full min-w-0 max-w-full flex flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
-                            <TabsTrigger value="staff-profile" className="shrink-0 text-xs sm:text-sm">
-                              Профиль
-                            </TabsTrigger>
-                            <TabsTrigger value="staff-workload" className="shrink-0 text-xs sm:text-sm">
-                              Нагрузка и режим
-                            </TabsTrigger>
-                            <TabsTrigger value="staff-surveys" className="shrink-0 text-xs sm:text-sm">
-                              Опросы
-                            </TabsTrigger>
-                            <TabsTrigger value="staff-external" className="shrink-0 text-xs sm:text-sm">
-                              Внешняя оценка
-                            </TabsTrigger>
-                            <TabsTrigger value="staff-rhythm" className="shrink-0 text-xs sm:text-sm">
-                              Оценка РИТМ
-                            </TabsTrigger>
-                            <TabsTrigger value="staff-compensation" className="shrink-0 text-xs sm:text-sm">
-                              Компенсация и кадровые вопросы
-                            </TabsTrigger>
-                            <TabsTrigger value="recommendations" className="shrink-0 text-xs sm:text-sm">
-                              Рекомендации
-                            </TabsTrigger>
-                          </TabsList>
-                          <TabsContent value="staff-profile" className="mt-0 flex flex-col gap-4">
-                            <DetailSection title="Профиль">
-                              <dl className="grid gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                  label="Табельный номер"
-                                  value={selectedStaffMember.personnelNumber}
-                                  insight="Идентификатор сотрудника в кадровых системах. Помогает точно сопоставлять записи между источниками данных."
-                                />
-                                <DetailItem
-                                  label="Логин"
-                                  value={selectedStaffMember.login ?? "—"}
-                                  insight="Корпоративная учётная запись. Полезна для проверки активности и связки с ИТ-данными."
-                                />
-                                <DetailItem
-                                  label="Стаж в Банке"
-                                  value={selectedStaffMember.bankTenure ?? "—"}
-                                  insight="Показывает глубину опыта внутри банка. Длинный стаж помогает оценить экспертизу и возможную роль носителя знаний."
-                                />
-                                <DetailItem
-                                  label="Стаж в Блоке, ССП"
-                                  value={selectedStaffMember.blockTenure ?? "—"}
-                                  insight="Отражает опыт именно в текущем бизнес-контексте. Важен для оценки адаптации и устойчивости в роли."
-                                />
-                                <DetailItem
-                                  label="Возраст"
-                                  value={selectedStaffMember.age ?? "—"}
-                                  insight="Используется только как демографический контекст. Сам по себе не является оценочным выводом."
-                                />
-                                <DetailItem
-                                  label="Дней неисп. отпуска"
-                                  value={selectedStaffMember.unusedVacationDays ?? "—"}
-                                  insight="Высокий остаток отпуска может быть косвенным сигналом нагрузки, риска выгорания или проблем с планированием замещения."
-                                />
-                              </dl>
-                            </DetailSection>
-                          </TabsContent>
-
-                          <TabsContent value="staff-workload" className="mt-0 flex flex-col gap-4">
-                            <DetailSection title="Нагрузка и режим">
-                              <dl className="grid gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                  label="Переработки"
-                                  insight="Показывает наличие признаков повышенной нагрузки. Важно сопоставлять с режимом работы, СУРВ-данными и результативностью."
-                                  value={
-                                    (selectedStaffMember.overtimeHoursLastMonth ?? 0) > 0 ? (
-                                      <DetailTag className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                        ДА
-                                      </DetailTag>
-                                    ) : (
-                                      <DetailTag className="bg-muted text-muted-foreground">
-                                        НЕТ
-                                      </DetailTag>
-                                    )
-                                  }
-                                />
-                                <DetailItem
-                                  label="Режим работы"
-                                  value={selectedStaffMember.workMode ?? "—"}
-                                  insight="Помогает корректно трактовать офисное время и переработки: разные режимы дают разные нормы присутствия."
-                                />
-                                <DetailItem
-                                  label="Чистое время в офисе"
-                                  value={formatMinutesToHourMinute(selectedStaffMember.overtimeOfficeMinutesLast3Months)}
-                                  insight="Среднее чистое присутствие в офисе за рабочий день. Используется как один из сигналов фактической нагрузки."
-                                />
-                                <DetailItem
-                                  label="Работа за компьютером"
-                                  value={formatMinutesToHourMinute(selectedStaffMember.overtimeComputerMinutesLast3Months)}
-                                  insight="Отражает цифровую активность за рабочий день. Рост показателя без результата может сигнализировать о перегрузке или неэффективности."
-                                />
-                                <DetailItem
-                                  label="ПК + звонки"
-                                  value={formatMinutesToHourMinute(selectedStaffMember.overtimeComputerAndCallsMinutesLast3Months)}
-                                  insight="Суммарная активность за компьютером и в звонках. Помогает оценить коммуникационную и операционную нагрузку."
-                                />
-                              </dl>
-                            </DetailSection>
-                          </TabsContent>
-
-                          <TabsContent value="staff-surveys" className="mt-0 flex flex-col gap-4">
-                            <DetailSection title="Опросы">
-                              <dl className="grid gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                  label="Опрос - результат"
-                                  insight="Категория по вкладу в результат. Низкая категория требует сверки с фактическими задачами и ожиданиями роли."
-                                  value={
-                                    <DetailTag className={SURVEY_CATEGORY_CLASSES[selectedStaffSurveyResult]}>
-                                      {SURVEY_CATEGORY_LABELS[selectedStaffSurveyResult]}
-                                    </DetailTag>
-                                  }
-                                />
-                                <DetailItem
-                                  label="Опрос - команда"
-                                  insight="Категория по командному взаимодействию. Помогает увидеть, как сотрудник влияет на совместную работу и климат команды."
-                                  value={
-                                    <DetailTag className={SURVEY_CATEGORY_CLASSES[selectedStaffSurveyTeam]}>
-                                      {SURVEY_CATEGORY_LABELS[selectedStaffSurveyTeam]}
-                                    </DetailTag>
-                                  }
-                                />
-                              </dl>
-                            </DetailSection>
-                          </TabsContent>
-
-                          <TabsContent value="staff-external" className="mt-0 flex flex-col gap-4">
-                            <DetailSection title="Внешняя оценка">
-                              <dl className="grid gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                  label="Внешняя оценка"
-                                  insight="Показывает, есть ли подтверждённый положительный результат внешней оценки. Используется как независимый сигнал по сотруднику."
-                                  value={
-                                    selectedStaffMember.externalAssessmentResult === undefined ? (
-                                      "—"
-                                    ) : selectedStaffMember.externalAssessmentResult >= 4 ? (
-                                      <DetailTag className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                        ДА
-                                      </DetailTag>
-                                    ) : (
-                                      <DetailTag className="bg-muted text-muted-foreground">
-                                        НЕТ
-                                      </DetailTag>
-                                    )
-                                  }
-                                />
-                                <DetailItem
-                                  label="Балл внешней оценки"
-                                  value={selectedStaffMember.externalAssessmentResult ?? "—"}
-                                  insight="Числовой результат внешней оценки от 1 до 5. Помогает сопоставить внутренние и внешние оценочные сигналы."
-                                />
-                                <DetailItem
-                                  label="Провайдер"
-                                  value={selectedStaffMember.externalAssessmentProvider ?? "—"}
-                                  insight="Организация, проводившая внешнюю оценку. Важна для понимания методологии и сопоставимости результата."
-                                />
-                                <DetailItem
-                                  label="Период"
-                                  value={selectedStaffMember.externalAssessmentYear ?? "—"}
-                                  insight="Год проведения оценки. Чем старше период, тем осторожнее нужно использовать результат для текущих решений."
-                                />
-                                <DetailItem
-                                  label="Файл с результатами"
-                                  insight="Ссылка на первичный документ с результатами внешней оценки. Используется для проверки деталей и источника вывода."
-                                  value={
-                                    selectedStaffMember.externalAssessmentResultPdf ? (
-                                      <a
-                                        href={selectedStaffMember.externalAssessmentResultPdf}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-primary underline underline-offset-2 hover:text-primary/80"
-                                      >
-                                        {selectedStaffMember.externalAssessmentResultPdf.split("/").at(-1)}
-                                      </a>
-                                    ) : (
-                                      "—"
-                                    )
-                                  }
-                                />
-                              </dl>
-                            </DetailSection>
-                          </TabsContent>
-
-                          <TabsContent value="staff-rhythm" className="mt-0 flex flex-col gap-4">
-                            <DetailSection title="Оценка РИТМ">
-                              <dl className="grid gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                  label="Оценка РИТМ"
-                                  insight="Бинарный сигнал по результатам РИТМ: ДА означает, что актуальная оценка достигает целевого уровня."
-                                  value={
-                                    selectedStaffMember.rhythmAssessmentResult === undefined ? (
-                                      "—"
-                                    ) : selectedStaffMember.rhythmAssessmentResult >= 4 ? (
-                                      <DetailTag className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                        ДА
-                                      </DetailTag>
-                                    ) : (
-                                      <DetailTag className="bg-muted text-muted-foreground">
-                                        НЕТ
-                                      </DetailTag>
-                                    )
-                                  }
-                                />
-                                <DetailItem
-                                  label="Балл РИТМ"
-                                  value={selectedStaffMember.rhythmAssessmentResult ?? "—"}
-                                  insight="Числовой результат РИТМ от 1 до 5. Значения 4-5 трактуются как положительный сигнал."
-                                />
-                              </dl>
-                            </DetailSection>
-                          </TabsContent>
-
-                          <TabsContent value="staff-compensation" className="mt-0 flex flex-col gap-4">
-                            <DetailSection title="Компенсация и кадровые вопросы">
-                              <dl className="grid gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                  label="Уровень З/П относительно рынка"
-                                  insight="Сравнивает компенсацию с рыночным ориентиром. Низкий уровень при сильных оценках может усиливать риск удержания."
-                                  value={
-                                    <DetailTag className={SALARY_MARKET_LEVEL_CLASSES[selectedStaffSalaryMarketLevel]}>
-                                      {SALARY_MARKET_LEVEL_LABELS[selectedStaffSalaryMarketLevel]}
-                                    </DetailTag>
-                                  }
-                                />
-                                <DetailItem
-                                  label="ФКР"
-                                  insight="Показывает, входит ли сотрудник в кадровый резерв или фокусный кадровый контур. Важно для планирования развития и преемственности."
-                                  value={
-                                    <DetailTag className={FKR_STATUS_CLASSES[selectedStaffFkrStatus]}>
-                                      {FKR_STATUS_LABELS[selectedStaffFkrStatus]}
-                                    </DetailTag>
-                                  }
-                                />
-                                <DetailItem
-                                  label="Дата пересмотра должности"
-                                  value={selectedStaffMember.positionReviewDate ?? "—"}
-                                  insight="Дата последнего или планового пересмотра должности. Помогает видеть актуальность роли и возможные кадровые ожидания."
-                                />
-                                <DetailItem
-                                  label="Дата пересмотра оклада"
-                                  value={selectedStaffMember.salaryReviewDate ?? "—"}
-                                  insight="Дата последнего или планового пересмотра оклада. Важна для оценки компенсационного риска и своевременности решений."
-                                />
-                              </dl>
-                            </DetailSection>
-                          </TabsContent>
-
-                          <TabsContent value="recommendations" className="mt-0">
-                            <div className="grid gap-4 lg:grid-cols-2">
-                              <DetailSection title="Сильные стороны">
-                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
-                                  <li>
-                                    Стаж в банке и в блоке указывает на накопленный организационный капитал:
-                                    сотрудник понимает внутренние процессы, стейкхолдеров и неформальные правила принятия решений.
-                                  </li>
-                                  <li>
-                                    Результаты РИТМ и внешней оценки дают основу для калибровки по модели evidence-based HR:
-                                    решения по развитию и удержанию можно опирать не только на мнение руководителя, но и на независимые сигналы.
-                                  </li>
-                                  <li>
-                                    Статус ФКР:{" "}
-                                    <DetailTag className={FKR_STATUS_CLASSES[selectedStaffFkrStatus]}>
-                                      {FKR_STATUS_LABELS[selectedStaffFkrStatus]}
-                                    </DetailTag>
-                                    {" "}помогает определить, стоит ли рассматривать сотрудника как элемент кадровой преемственности,
-                                    участника talent pool или кандидата на расширение роли.
-                                  </li>
-                                  <li>
-                                    При категории опроса по результату{" "}
-                                    <DetailTag className={SURVEY_CATEGORY_CLASSES[selectedStaffSurveyResult]}>
-                                      {selectedStaffSurveyResult}
-                                    </DetailTag>
-                                    {" "}важно зафиксировать конкретные поведенческие примеры вклада, чтобы сильные стороны можно было масштабировать.
-                                  </li>
-                                </ul>
-                              </DetailSection>
-
-                              <DetailSection title="Зоны развития">
-                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
-                                  <li>
-                                    Провести калибровочную беседу по двум осям: вклад в результат и командное взаимодействие.
-                                    Если оценки расходятся, использовать подход “performance x behavior”, чтобы не развивать только результат в ущерб команде.
-                                  </li>
-                                  <li>
-                                    Сверить СУРВ-показатели, переработки и режим работы с фактическим портфелем задач.
-                                    В мировой практике это часть workload review: важно понять, нагрузка создаёт ценность или маскирует неэффективность процесса.
-                                  </li>
-                                  <li>
-                                    Уточнить ожидания по роли и карьерному шагу, особенно если даты пересмотра должности или оклада приближаются.
-                                    Рекомендуется оформить 2-3 измеримых результата на следующий квартал.
-                                  </li>
-                                  <li>
-                                    Если баллы оценки ниже целевого уровня, не ограничиваться обучением: определить, что мешает результату —
-                                    навыки, полномочия, приоритеты, качество постановки задач или конфликт целей.
-                                  </li>
-                                </ul>
-                              </DetailSection>
-
-                              <DetailSection title="Возможности">
-                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
-                                  <li>
-                                    При положительных оценочных сигналах использовать stretch assignment: дать проект выше текущего уровня сложности,
-                                    но с понятным спонсором, сроком и критериями успеха.
-                                  </li>
-                                  <li>
-                                    Подготовить IDP на 3-6 месяцев: одна бизнес-цель, одна поведенческая компетенция,
-                                    один измеримый артефакт результата и регулярные check-in встречи.
-                                  </li>
-                                  <li>
-                                    Синхронизировать компенсационные решения с вкладом, рынком и кадровым статусом.
-                                    Если сотрудник ниже рынка и демонстрирует сильные сигналы, это кандидат на retention action.
-                                  </li>
-                                  <li>
-                                    Использовать сотрудника как носителя практик: наставничество, разбор кейсов, участие в онбординге
-                                    или передача экспертизы могут повысить устойчивость команды.
-                                  </li>
-                                </ul>
-                              </DetailSection>
-
-                              <DetailSection title="Риски">
-                                <ul className="flex list-inside list-disc flex-col gap-2 text-sm text-muted-foreground">
-                                  <li>
-                                    Текущий результат оценки:{" "}
-                                    <CriticalityTag level={selectedStaffCriticality} />
-                                    . При высоком результате оценки рекомендован формат case review: руководитель, HR и при необходимости куратор функции
-                                    должны согласовать единый план действий и владельца решения.
-                                  </li>
-                                  <li>
-                                    Компенсационный риск усиливается, если уровень З/П ниже рынка при сильных оценочных сигналах.
-                                    В практике total rewards это зона риска удержания и снижения вовлечённости.
-                                  </li>
-                                  <li>
-                                    Накопленная нагрузка, переработки и неиспользованный отпуск могут указывать на риск выгорания.
-                                    Нужна проверка не только часов, но и управляемости задач: срочность, автономность, ясность приоритетов.
-                                  </li>
-                                  <li>
-                                    Если внешняя оценка, РИТМ и опросы дают разнонаправленные сигналы, нельзя принимать решение по одному показателю.
-                                    Нужна калибровка данных и управленческое интервью с примерами поведения.
-                                  </li>
-                                </ul>
-                              </DetailSection>
-                            </div>
-                          </TabsContent>
-                        </Tabs>
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-              </DialogContent>
-            </Dialog>
+              onResignationProbabilityChange={(staffId, value) => {
+                setResignationProbabilityOverrides((prev) => ({ ...prev, [staffId]: value }))
+              }}
+              onSelectStaff={setSelectedStaffMember}
+              onOpenNotebook={openStaffNotebook}
+              totalStaffItems={totalStaffItems}
+              staffPage={staffPage}
+              staffPages={staffPages}
+              safeStaffPage={safeStaffPage}
+              staffPageSize={staffPageSize}
+              onStaffPageSizeChange={(size) => {
+                setStaffPageSize(size)
+                setStaffPage(1)
+              }}
+              onStaffPagePrev={() => setStaffPage((p) => Math.max(1, p - 1))}
+              onStaffPageNext={() => setStaffPage((p) => Math.min(staffPages, p + 1))}
+            />
+            <StaffAssessmentDetailModal
+              selectedStaffMember={selectedStaffMember}
+              setSelectedStaffMember={setSelectedStaffMember}
+              selectedStaffUnitPath={selectedStaffUnitPath}
+              selectedStaffCriticality={selectedStaffCriticality}
+              selectedStaffSalaryMarketLevel={selectedStaffSalaryMarketLevel}
+              selectedStaffFkrStatus={selectedStaffFkrStatus}
+              selectedStaffSurveyResult={selectedStaffSurveyResult}
+              selectedStaffSurveyTeam={selectedStaffSurveyTeam}
+            />
             <Sheet
               open={isNineBoxOpen}
               onOpenChange={(open) => {
@@ -2967,13 +1992,13 @@ export default function AssessmentPage() {
                                         >
                                           <div className="space-y-3 p-3">
                                             {needsEvaluation ? (
-                                              <p className="text-xs text-amber-800 dark:text-amber-300/90">
+                                              <p className="text-sm text-amber-800 dark:text-amber-300/90">
                                                 Для попадания в 12×box: заполните категорию
                                                 сотрудника и вероятность увольнения.
                                               </p>
                                             ) : null}
                                             <div className="space-y-1">
-                                              <p className="text-xs font-medium text-muted-foreground">
+                                              <p className="text-sm font-medium text-muted-foreground">
                                                 Опрос: вклад в достижение результатов
                                               </p>
                                               <p className="font-medium text-foreground">
@@ -2981,7 +2006,7 @@ export default function AssessmentPage() {
                                               </p>
                                             </div>
                                             <div className="space-y-1">
-                                              <p className="text-xs font-medium text-muted-foreground">
+                                              <p className="text-sm font-medium text-muted-foreground">
                                                 Опрос: командное взаимодействие
                                               </p>
                                               <p className="font-medium text-foreground">
@@ -3118,14 +2143,14 @@ export default function AssessmentPage() {
                     {nineBoxRoleDetail ? (
                       <div className="space-y-6 text-sm">
                         <section>
-                          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                             Характеристика группы
                           </h3>
                           <p className="text-foreground/90">{nineBoxRoleDetail.summary}</p>
                         </section>
                         {nineBoxRoleDetail.strengths.length > 0 ? (
                           <section>
-                            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                               Сильные стороны
                             </h3>
                             <ul className="list-inside list-disc space-y-1 text-muted-foreground">
@@ -3137,7 +2162,7 @@ export default function AssessmentPage() {
                         ) : null}
                         {nineBoxRoleDetail.risks.length > 0 ? (
                           <section>
-                            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                               Риски и зоны внимания
                             </h3>
                             <ul className="list-inside list-disc space-y-1 text-muted-foreground">
@@ -3149,7 +2174,7 @@ export default function AssessmentPage() {
                         ) : null}
                         {nineBoxRoleDetail.development.length > 0 ? (
                           <section>
-                            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                               Развитие и действия руководителя
                             </h3>
                             <ul className="list-inside list-disc space-y-1 text-muted-foreground">
@@ -3161,7 +2186,7 @@ export default function AssessmentPage() {
                         ) : null}
                         {nineBoxRoleDetail.nextSteps.length > 0 ? (
                           <section>
-                            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                               Дальнейшие шаги и акценты
                             </h3>
                             <ul className="list-inside list-disc space-y-1 text-muted-foreground">
@@ -3172,7 +2197,7 @@ export default function AssessmentPage() {
                           </section>
                         ) : null}
                         <section>
-                          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                             Сотрудники в ячейке ({nineBoxDetailStaff.length})
                           </h3>
                           {nineBoxDetailStaff.length === 0 ? (
@@ -3225,7 +2250,7 @@ export default function AssessmentPage() {
                           key={`${entry.createdAt}-${index}`}
                           className="space-y-1 rounded-md border border-border/70 bg-muted/20 px-3 py-2"
                         >
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             {entry.subjectFio}, {entry.createdAt}
                           </p>
                           <p className="whitespace-pre-wrap text-sm text-foreground">{entry.text}</p>

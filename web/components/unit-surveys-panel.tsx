@@ -673,10 +673,10 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
                       )}
                     >
                       <div className="flex items-center justify-between border-b border-border/80 bg-muted/60 px-4 py-2.5">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
                           {statusLabel}
                         </h3>
-                        <span className="text-xs text-muted-foreground">{group.items.length} шт.</span>
+                        <span className="text-sm text-muted-foreground">{group.items.length} шт.</span>
                       </div>
                       <div className="grid grid-cols-5 gap-6 p-5">
                         {group.items.map((a, index) => {
@@ -708,7 +708,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
                                   </p>
                                   <span
                                     className={cn(
-                                      "shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold",
+                                      "shrink-0 rounded-full border px-2 py-0.5 text-sm font-semibold",
                                       statusBadgeClass(a.status)
                                     )}
                                   >
@@ -797,7 +797,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
                           <td className="px-2 py-2 text-sm">
                             <span
                               className={cn(
-                                "inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold",
+                                "inline-flex rounded-full border px-2 py-0.5 text-sm font-semibold",
                                 statusBadgeClass(a.status)
                               )}
                             >
@@ -1030,7 +1030,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
                           >
                             <div className="min-w-0">
                               <p className="font-medium text-foreground">{formatFioMember(member)}</p>
-                              <p className="text-xs text-muted-foreground">{member.position}</p>
+                              <p className="text-sm text-muted-foreground">{member.position}</p>
                             </div>
                             <Button
                               type="button"
@@ -1330,7 +1330,7 @@ export function UnitSurveysPanel({ unitOptions }: { unitOptions: UnitOption[] })
                             >
                               <div className="min-w-0">
                                 <p className="font-medium text-foreground">{formatFioMember(member)}</p>
-                                <p className="text-xs text-muted-foreground">{member.position}</p>
+                                <p className="text-sm text-muted-foreground">{member.position}</p>
                               </div>
                               <Button
                                 type="button"

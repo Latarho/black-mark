@@ -490,7 +490,7 @@ export function D3OrgChartView() {
                 <div className="flex flex-col gap-3">
                   <p className="text-sm font-medium text-foreground">Контакты</p>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                       Рабочая электронная почта
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -498,7 +498,7 @@ export function D3OrgChartView() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                       Городской номер
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -506,7 +506,7 @@ export function D3OrgChartView() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                       Внутренний номер
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -514,7 +514,7 @@ export function D3OrgChartView() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                       Адрес
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
