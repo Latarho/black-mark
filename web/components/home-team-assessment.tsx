@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ArrowUpRight, CalendarDays, SearchIcon, XIcon } from "lucide-react"
 
 import {
@@ -9,6 +9,7 @@ import {
   type StaffYearAssessmentSlide,
 } from "@/components/assessment/staff-assessment-detail-modal"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -86,17 +87,37 @@ function executiveConcernScore(member: StaffMember, cycleYear: number): number {
   return byLetter[grade ?? "E"] ?? 55
 }
 
-export function HomeTeamAssessment({ team }: { team: StaffMember[] }) {
+export function HomeTeamAssessment({
+  team,
+  teamExpanded,
+}: {
+  team: StaffMember[]
+  teamExpanded: StaffMember[]
+}) {
   const [assessmentYear, setAssessmentYear] = useState<number>(ASSESSMENT_CYCLE_YEARS[0])
   const [staffSearchQuery, setStaffSearchQuery] = useState("")
   const [staffPage, setStaffPage] = useState(1)
   const [staffPageSize, setStaffPageSize] = useState<number>(50)
   const [sortMode, setSortMode] = useState<SortMode>("fio")
+  const [directSubordinatesOnly, setDirectSubordinatesOnly] = useState(true)
   const [selectedStaffMember, setSelectedStaffMember] = useState<StaffMember | null>(null)
+
+  const displayTeam = useMemo(
+    () => (directSubordinatesOnly ? team : teamExpanded),
+    [directSubordinatesOnly, team, teamExpanded]
+  )
+
+  useEffect(() => {
+    setSelectedStaffMember((prev) => {
+      if (!prev) return null
+      const ids = new Set(displayTeam.map((m) => m.id))
+      return ids.has(prev.id) ? prev : null
+    })
+  }, [displayTeam])
 
   const searchFiltered = useMemo(() => {
     const globalQuery = staffSearchQuery.trim().toLowerCase()
-    return team.filter((member) => {
+    return displayTeam.filter((member) => {
       const unitPath = getBreadcrumb(ORG_ROOT, member.unitId)
         .filter((unit) => unit.id !== ORG_ROOT.id)
         .map((unit) => unit.name)
@@ -105,7 +126,7 @@ export function HomeTeamAssessment({ team }: { team: StaffMember[] }) {
       const searchText = [fio, member.position, unitPath].join(" ").toLowerCase()
       return !globalQuery || searchText.includes(globalQuery)
     })
-  }, [team, staffSearchQuery])
+  }, [displayTeam, staffSearchQuery])
 
   const gradeDistribution = useMemo(() => {
     const result: Record<AssessmentGradeLevel | "not-formed", number> = {
@@ -287,8 +308,45 @@ export function HomeTeamAssessment({ team }: { team: StaffMember[] }) {
           </div>
         </div>
 
-        <div className="flex w-full min-w-0 justify-end">
-          <div className="inline-flex max-w-full min-w-0 flex-row flex-nowrap items-center gap-2 sm:gap-3">
+        <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 sm:gap-x-4">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  id="home-team-direct-subordinates-title"
+                  className="max-w-[min(100vw-10rem,16rem)] cursor-default truncate text-end text-sm font-medium text-muted-foreground underline decoration-dotted decoration-muted-foreground/60 underline-offset-2 sm:max-w-[20rem]"
+                >
+                  Сотрудники прямого подчинения
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end" className="max-w-xs text-sm leading-relaxed">
+                {directSubordinatesOnly ? (
+                  <p>
+                    В списке только ваш офис — коллеги по тому же подразделению, кроме вас. Выключите переключатель,
+                    чтобы добавить смежные отделы вашего управления.
+                  </p>
+                ) : (
+                  <p>
+                    В списке сотрудники вашего управления: ваш офис и смежные отделы. Включите переключатель, чтобы
+                    оставить только прямое подчинение (ваш офис).
+                  </p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+            <Switch
+              checked={directSubordinatesOnly}
+              onCheckedChange={(checked) => {
+                setDirectSubordinatesOnly(checked)
+                setStaffPage(1)
+              }}
+              aria-labelledby="home-team-direct-subordinates-title"
+              className="shrink-0"
+            />
+          </div>
+
+          <span className="hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden />
+
+          <div className="flex min-w-0 items-center gap-2">
             <span className="shrink-0 text-sm font-medium whitespace-nowrap text-muted-foreground">
               Сортировка
             </span>
@@ -296,7 +354,7 @@ export function HomeTeamAssessment({ team }: { team: StaffMember[] }) {
               value={sortMode}
               onValueChange={(v) => setSortModeAndReset(v as SortMode)}
             >
-              <SelectTrigger className="h-10 w-[min(100%,17.5rem)] min-w-0 shrink-0 sm:w-60">
+              <SelectTrigger className="h-10 w-[min(100%,14rem)] min-w-0 sm:w-60">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper">

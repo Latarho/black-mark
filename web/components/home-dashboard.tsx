@@ -61,11 +61,13 @@ const iconByHref: Record<string, typeof ClipboardListIcon> = {
 export function HomeDashboard({
   me,
   team,
+  teamExpanded,
   orgProfile,
   sectionLinks,
 }: {
   me: StaffMember
   team: StaffMember[]
+  teamExpanded: StaffMember[]
   orgProfile: HomeOrgProfile
   sectionLinks: HomeSectionLink[]
 }) {
@@ -217,7 +219,7 @@ export function HomeDashboard({
           </TabsContent>
 
           <TabsContent value="team" className="mt-0 min-h-0 w-full min-w-0 flex-1 text-left">
-            <HomeTeamAssessment team={team} />
+            <HomeTeamAssessment team={team} teamExpanded={teamExpanded} />
           </TabsContent>
         </Tabs>
       </section>

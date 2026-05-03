@@ -4,6 +4,7 @@ import {
   ORG_ROOT,
   STAFF,
   getBreadcrumb,
+  getManagementSubtreeTeamExcludingSelf,
   getStaffLineManagers,
   getStaffMemberById,
   getUnitColleaguesExcludingSelf,
@@ -31,6 +32,7 @@ export default function HomePage() {
     throw new Error("Демо-пользователь не найден в справочнике сотрудников")
   }
   const team = getUnitColleaguesExcludingSelf(me)
+  const teamExpanded = getManagementSubtreeTeamExcludingSelf(me)
   const path = getBreadcrumb(ORG_ROOT, me.unitId)
   const unitTrail = path
     .filter((u) => u.id !== ORG_ROOT.id)
@@ -48,6 +50,7 @@ export default function HomePage() {
     <HomeDashboard
       me={me}
       team={team}
+      teamExpanded={teamExpanded}
       orgProfile={orgProfile}
       sectionLinks={homeSectionLinks()}
     />

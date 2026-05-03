@@ -853,3 +853,30 @@ export function getUnitColleaguesExcludingSelf(member: StaffMember): StaffMember
     return an.localeCompare(bn, "ru")
   })
 }
+
+/**
+ * Расширенная «команда» для главной: все сотрудники в поддереве родительского управления
+ * относительно офиса сотрудника (например офис SOC → всё управление ИБ), без самого сотрудника.
+ * Если родителя нет — то же, что {@link getUnitColleaguesExcludingSelf}.
+ */
+export function getManagementSubtreeTeamExcludingSelf(member: StaffMember): StaffMember[] {
+  const path = getBreadcrumb(ORG_ROOT, member.unitId)
+  if (path.length < 2) {
+    return getUnitColleaguesExcludingSelf(member)
+  }
+  const parentUnit = path[path.length - 2]
+  const branchRoot = findUnit(ORG_ROOT, parentUnit.id)
+  if (!branchRoot) {
+    return getUnitColleaguesExcludingSelf(member)
+  }
+  const allowed = new Set(collectUnitIds(branchRoot))
+  const list = STAFF.filter((s) => allowed.has(s.unitId) && s.id !== member.id)
+  return list.sort((a, b) => {
+    const byUnit = a.unitId.localeCompare(b.unitId, "ru")
+    if (byUnit !== 0) return byUnit
+    const ah = a.isUnitHead ? 1 : 0
+    const bh = b.isUnitHead ? 1 : 0
+    if (bh !== ah) return bh - ah
+    return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "ru")
+  })
+}

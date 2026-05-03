@@ -1,0 +1,19 @@
+{
+  "name": "black-mark",
+  "private": true,
+  "workspaces": ["web"],
+  "dependencies": {
+    "next": "16.1.7"
+  },
+  "scripts": {
+    "build": "npm run build -w web",
+    "dev": "npm run dev -w web",
+    "lint": "npm run lint -w web",
+    "typecheck": "npm run typecheck -w web",
+    "test": "npm run test -w web",
+    "format": "npm run format -w web"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

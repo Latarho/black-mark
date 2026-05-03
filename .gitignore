@@ -1,2 +1,5 @@
 .DS_Store
 Thumbs.db
+
+# npm workspaces (lockfile в корне)
+/node_modules
