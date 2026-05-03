@@ -35,13 +35,10 @@ import {
   type StaffMember,
 } from "@/lib/bank-org-mock"
 import { getNineBoxRoleProfile } from "@/lib/assessment/nine-box-profiles"
-import { psychReportDemo } from "@/lib/psych-report-demo-data"
 import {
   formatFioMember,
   STAFF_TABLE_PAGE_SIZE_OPTIONS,
 } from "@/lib/staff-presentation"
-import { ExternalAssessmentPersonalReport } from "@/components/external-assessment-personal-report"
-import { UnitSurveysPanel } from "@/components/unit-surveys-panel"
 import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { DetailCardField, DetailCardSection } from "@/components/detail-card-section"
 import { Badge } from "@/components/ui/badge"
@@ -66,7 +63,6 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import {
   ChevronDown,
-  ChevronRight,
   SearchIcon,
   MessageSquare,
   SlidersHorizontalIcon,
@@ -286,8 +282,6 @@ export default function AssessmentPage() {
     null
   )
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
-  const [isExternalAssessmentsModalOpen, setIsExternalAssessmentsModalOpen] =
-    useState(false)
   const [notebookStaffId, setNotebookStaffId] = useState<string | null>(null)
   const [notebookDraft, setNotebookDraft] = useState("")
   const [staffNotebookEntries, setStaffNotebookEntries] = useState<Record<string, StaffNotebookEntry[]>>(
@@ -976,21 +970,9 @@ export default function AssessmentPage() {
           </TabsTrigger>
           <TabsTrigger
             value="team"
-            className="h-full rounded-none border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
-          >
-            Оценка команды
-          </TabsTrigger>
-          <TabsTrigger
-            value="external"
-            className="h-full rounded-none border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
-          >
-            Внешние оценки
-          </TabsTrigger>
-          <TabsTrigger
-            value="surveys"
             className="h-full rounded-none rounded-r-md border-0 px-1 py-0 text-sm leading-none shadow-none data-active:rounded-md"
           >
-            Опросы
+            Оценка команды
           </TabsTrigger>
         </TabsList>
         <TabsContent value="mine" className="mt-0 flex flex-1 flex-col" />
@@ -3273,51 +3255,6 @@ export default function AssessmentPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          </section>
-        </TabsContent>
-        <TabsContent
-          value="external"
-          className="mt-0 flex min-h-0 flex-1 flex-col"
-        >
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-card px-4 py-6">
-            <h2 className="text-base font-semibold text-foreground">
-              Внешние оценки
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              В этом разделе будет отображаться свод внешних оценок и источники
-              данных (аудит, обратная связь клиентов, подрядчики и т.п.).
-            </p>
-            <button
-              type="button"
-              onClick={() => setIsExternalAssessmentsModalOpen(true)}
-              className="mt-6 flex w-full max-w-xl items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <div className="min-w-0">
-                <span className="block text-sm font-medium text-foreground">
-                  Свод внешних оценок
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Нажмите, чтобы открыть
-                </span>
-              </div>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            </button>
-            <Dialog
-              open={isExternalAssessmentsModalOpen}
-              onOpenChange={setIsExternalAssessmentsModalOpen}
-            >
-              <DialogContent maxWidth="wide" className="max-h-[90vh] gap-0 overflow-hidden p-0">
-                <DialogTitle className="sr-only">Персональный отчёт по внешней оценке</DialogTitle>
-                <div className="max-h-[90vh] overflow-y-auto px-6 py-5">
-                  <ExternalAssessmentPersonalReport data={psychReportDemo} />
-                </div>
-              </DialogContent>
-            </Dialog>
-          </section>
-        </TabsContent>
-        <TabsContent value="surveys" className="mt-0 flex min-h-0 flex-1 flex-col">
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-card">
-            <UnitSurveysPanel unitOptions={unitOptions} />
           </section>
         </TabsContent>
       </Tabs>

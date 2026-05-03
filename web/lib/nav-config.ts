@@ -3,9 +3,11 @@ import {
   BriefcaseIcon,
   ClipboardListIcon,
   HomeIcon,
+  MessageSquareIcon,
+  ListOrderedIcon,
   NetworkIcon,
+  ScrollTextIcon,
   SettingsIcon,
-  SnowflakeIcon,
   TargetIcon,
   UserRoundSearchIcon,
 } from "lucide-react"
@@ -20,7 +22,7 @@ export type AppNavItem = {
 }
 
 export type AppNavGroup = {
-  id: "main" | "assessment" | "talent" | "admin"
+  id: "main" | "assessment" | "organization" | "talent" | "admin"
   groupLabel: string
   items: AppNavItem[]
 }
@@ -51,6 +53,21 @@ export const APP_NAV: AppNavGroup[] = [
         icon: ClipboardListIcon,
         isActive: (p) => p === "/assessment" || p.startsWith("/assessment/"),
       },
+      {
+        href: "/external-assessments",
+        label: "Внешние оценки",
+        tooltip: "Внешние оценки",
+        icon: ScrollTextIcon,
+        isActive: (p) =>
+          p === "/external-assessments" ||
+          p.startsWith("/external-assessments/"),
+      },
+    ],
+  },
+  {
+    id: "organization",
+    groupLabel: "Организационная структура",
+    items: [
       {
         href: "/cabinet/staff",
         label: "Организационная структура",
@@ -84,10 +101,17 @@ export const APP_NAV: AppNavGroup[] = [
         href: "/tselepolaganie-kold",
         label: "Целеполагание КОЛД",
         tooltip: "Целеполагание КОЛД",
-        icon: SnowflakeIcon,
+        icon: ListOrderedIcon,
         isActive: (p) =>
           p === "/tselepolaganie-kold" ||
           p.startsWith("/tselepolaganie-kold/"),
+      },
+      {
+        href: "/surveys",
+        label: "Опросы",
+        tooltip: "Опросы",
+        icon: MessageSquareIcon,
+        isActive: (p) => p === "/surveys" || p.startsWith("/surveys/"),
       },
       {
         href: "/career",

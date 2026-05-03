@@ -5,9 +5,11 @@ import Link from "next/link"
 import {
   BriefcaseIcon,
   ClipboardListIcon,
+  MessageSquareIcon,
+  ListOrderedIcon,
   NetworkIcon,
+  ScrollTextIcon,
   SettingsIcon,
-  SnowflakeIcon,
   TargetIcon,
   UserRoundSearchIcon,
 } from "lucide-react"
@@ -46,11 +48,13 @@ function ProfileAttrRow({ label, children }: { label: string; children: ReactNod
 
 const iconByHref: Record<string, typeof ClipboardListIcon> = {
   "/assessment": ClipboardListIcon,
+  "/external-assessments": ScrollTextIcon,
   "/cabinet/staff": NetworkIcon,
   "/admin": SettingsIcon,
   "/assessment-center": UserRoundSearchIcon,
   "/tselepolaganie": TargetIcon,
-  "/tselepolaganie-kold": SnowflakeIcon,
+  "/tselepolaganie-kold": ListOrderedIcon,
+  "/surveys": MessageSquareIcon,
   "/career": BriefcaseIcon,
 }
 
@@ -173,39 +177,41 @@ export function HomeDashboard({
                 </div>
               </aside>
               <div className="min-w-0 lg:col-span-3">
-                <DetailCardSection title="Разделы" variant="compact" surface="panel">
-                  <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {sectionLinks.map(({ href, label, description }) => {
-                      const Icon = iconByHref[href] ?? ClipboardListIcon
-                      return (
-                        <li key={href}>
-                          <Link
-                            href={href}
-                            className={cn(
-                              "group flex min-h-[5.5rem] flex-col justify-between rounded-md border border-border bg-muted/20 p-3 transition-colors",
-                              "hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-4"
-                            )}
-                          >
-                            <div className="flex items-start gap-3">
-                              <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors group-hover:bg-muted/50">
-                                <Icon className="size-4" aria-hidden />
-                              </span>
-                              <div className="min-w-0">
-                                <span className="block font-medium text-foreground">{label}</span>
-                                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                                  {description}
+                <div className="overflow-hidden rounded-lg border border-border bg-card">
+                  <div className="p-3 md:p-4">
+                    <ul className="flex flex-col gap-3">
+                      {sectionLinks.map(({ href, label, description }) => {
+                        const Icon = iconByHref[href] ?? ClipboardListIcon
+                        return (
+                          <li key={href} className="min-w-0">
+                            <Link
+                              href={href}
+                              className={cn(
+                                "group flex w-full min-w-0 items-center justify-between gap-4 rounded-md border border-border bg-muted/20 px-4 py-3 transition-colors",
+                                "hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:py-4"
+                              )}
+                            >
+                              <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors group-hover:bg-muted/50">
+                                  <Icon className="size-4" aria-hidden />
                                 </span>
+                                <div className="min-w-0 flex-1">
+                                  <span className="block font-medium text-foreground">{label}</span>
+                                  <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                                    {description}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-primary">
-                              Перейти
-                            </span>
-                          </Link>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </DetailCardSection>
+                              <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-primary">
+                                Перейти
+                              </span>
+                            </Link>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </TabsContent>
