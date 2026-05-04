@@ -7,13 +7,6 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -22,12 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import {
   ORG_ROOT,
   STAFF,
@@ -39,75 +26,41 @@ import {
   formatFioMember,
   STAFF_TABLE_PAGE_SIZE_OPTIONS,
 } from "@/lib/staff-presentation"
-import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { StaffAssessmentDetailModal } from "@/components/assessment/staff-assessment-detail-modal"
 import { AssessmentGradeSummary } from "@/components/assessment/assessment-grade-summary"
-import { StructuredTooltipContent } from "@/components/assessment/structured-tooltip-content"
-import { DetailCardField, DetailCardSection } from "@/components/detail-card-section"
+import { TeamMatrixSheet } from "@/components/assessment/team-matrix-sheet"
 import { Badge } from "@/components/ui/badge"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
 import {
   ChevronDown,
   SearchIcon,
   SlidersHorizontalIcon,
   XIcon,
-  Users,
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import {
-  ASSESSMENT_GRADE_HINTS,
-  ASSESSMENT_SELECT_CONTENT_CLASS,
-  ASSESSMENT_SELECT_TRIGGER_CLASS,
   CRITICALITY_FILTER_OPTIONS,
-  CRITICALITY_LETTER_TEXT_CLASSES,
-  CRITICALITY_LEVEL_CLASSES,
   CRITICALITY_LEVEL_LABELS,
   EMPLOYEE_CATEGORY_OPTIONS,
   EXTERNAL_FILTER_OPTIONS,
-  FKR_STATUS_CLASSES,
   FKR_STATUS_FILTER_OPTIONS,
   FKR_STATUS_LABELS,
-  FKR_TABLE_TAG_CLASS,
   OVERTIME_FILTER_OPTIONS,
   RESIGNATION_PROBABILITY_OPTIONS,
   RHYTHM_FILTER_OPTIONS,
   SALARY_MARKET_LEVEL_LABELS,
   SALARY_MARKET_LEVEL_OPTIONS,
-  SURVEY_CATEGORY_CLASSES,
   SURVEY_CATEGORY_LABELS,
   SURVEY_CATEGORY_OPTIONS,
-  TABLE_TAG_TEXT_CLASS,
   TEAM_MATRIX_AXIS_LABELS,
   TEAM_MATRIX_OPTIONS,
-  formatMinutesToHourMinute,
   formatNotebookDateTime,
   getAssessmentGrade,
   getAssessmentGradeForMember,
   getEffectiveSalaryMarketLevel,
   getEmployeeCategory,
-  getManagerTwelveBoxCellGrade,
   getMatrixCellRows,
   getResignationProbability,
-  getTeamMatrixCellTone,
   hasOvertime,
   hasRequiredAssessment,
   isFullyAssessedForManagerMatrix,
@@ -126,6 +79,7 @@ import {
   type TeamMatrixMode,
 } from "@/lib/assessment-model"
 import { collectUnitOptions, getSelectedUnitsLabel } from "@/lib/unit-options"
+import { useTeamMatrixFilters } from "@/lib/assessment/use-team-matrix-filters"
 import { TeamAssessmentStaffTable } from "@/components/assessment/team-assessment-staff-table"
 
 function AssessmentTabQuerySync({
@@ -140,16 +94,6 @@ function AssessmentTabQuerySync({
     else if (t === "mine") setTab("mine")
   }, [searchParams, setTab])
   return null
-}
-
-function MiniAvatar({ member }: { member: StaffMember }) {
-  return (
-    <StaffMemberAvatar
-      member={member}
-      className="size-10 text-base"
-      initials="assessment"
-    />
-  )
 }
 
 export default function AssessmentPage() {
@@ -385,12 +329,7 @@ export default function AssessmentPage() {
         formatFioMember(b)
       )
     })
-  }, [
-    filteredStaff,
-    salaryMarketLevelOverrides,
-    employeeCategoryOverrides,
-    resignationProbabilityOverrides,
-  ])
+  }, [filteredStaff])
   const assessmentGradeDistribution = useMemo(() => {
     const result: Record<AssessmentGradeLevel | "not-formed", number> = {
       A: 0,
@@ -419,11 +358,6 @@ export default function AssessmentPage() {
     employeeCategoryOverrides,
     resignationProbabilityOverrides,
   ])
-  const assessmentSummaryTotal = filteredStaffForGradeSummary.length
-  const getAssessmentSummaryPercent = (value: number) => {
-    if (assessmentSummaryTotal === 0) return 0
-    return Math.round((value / assessmentSummaryTotal) * 100)
-  }
   const totalStaffItems = filteredStaff.length
   const staffPages = Math.max(1, Math.ceil(totalStaffItems / staffPageSize))
   const safeStaffPage = Math.min(staffPage, staffPages)
@@ -597,189 +531,38 @@ export default function AssessmentPage() {
     employeeCategoryOverrides,
     resignationProbabilityOverrides,
   ])
-  const resetFiltersForMatrix = () => {
-    setNineBoxCellDetail(null)
-    setStaffPage(1)
-  }
-
-  const clearMatrixUnitFilter = (unitId: string) => {
-    setSelectedUnitIds((prev) => prev.filter((id) => id !== unitId))
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixFioFilter = () => {
-    setFioFilterQuery("")
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixPositionFilter = (position: string) => {
-    setSelectedPositionIds((prev) => prev.filter((item) => item !== position))
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixSalaryFilter = (value: SalaryMarketLevel) => {
-    setSalaryMarketFilters((prev) => prev.filter((item) => item !== value))
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixEmployeeCategoryFilter = (value: EmployeeCategoryLevel) => {
-    setEmployeeCategoryFilters((prev) => prev.filter((item) => item !== value))
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixResignationProbabilityFilter = (value: ResignationProbabilityLevel) => {
-    setResignationProbabilityFilters((prev) => prev.filter((item) => item !== value))
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixFkrFilter = (value: FkrStatus) => {
-    setFkrStatusFilters((prev) => prev.filter((item) => item !== value))
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixOvertimeFilters = () => {
-    setOvertimeFilter("all")
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixRhythmFilter = () => {
-    setRhythmAssessmentFilter("all")
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixExternalFilter = () => {
-    setExternalAssessmentFilter("all")
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixSurveyResultFilter = (value: SurveyCategoryLevel) => {
-    setSurveyResultFilters((prev) => prev.filter((item) => item !== value))
-    resetFiltersForMatrix()
-  }
-
-  const clearMatrixSurveyInteractionFilter = (value: SurveyCategoryLevel) => {
-    setSurveyInteractionFilters((prev) => prev.filter((item) => item !== value))
-    resetFiltersForMatrix()
-  }
-
-  const teamMatrixFilterTags = useMemo(
-    () => [
-      ...selectedUnitTags.map((unit) => ({
-        id: `unit-${unit.id}`,
-        label: `Подразделение: ${unit.label}`,
-        onClear: () => clearMatrixUnitFilter(unit.id),
-      })),
-      ...selectedPositionIds.map((position) => ({
-        id: `position-${position}`,
-        label: `Должность: ${position}`,
-        onClear: () => clearMatrixPositionFilter(position),
-      })),
-      ...(fioFilterQuery.trim()
-        ? [
-            {
-              id: "fio",
-              label: `ФИО: ${fioFilterQuery.trim()}`,
-              onClear: clearMatrixFioFilter,
-            },
-          ]
-        : []),
-      ...criticalityFilters.map((item) => ({
-        id: `criticality-${item}`,
-        label: `Результат оценки: ${CRITICALITY_LEVEL_LABELS[item]}`,
-        onClear: () => clearMatrixCriticalityFilter(item),
-      })),
-      ...(showNotFormedCriticalityFilter
-        ? [
-            {
-              id: "criticality-not-formed",
-              label: "Результат оценки: Не сформирован",
-              onClear: clearNotFormedCriticalityFilter,
-            },
-          ]
-        : []),
-      ...employeeCategoryFilters.map((item) => ({
-        id: `employee-category-${item}`,
-        label: `Категория сотрудника: ${
-          EMPLOYEE_CATEGORY_OPTIONS.find((option) => option.value === item)?.label ?? item
-        }`,
-        onClear: () => clearMatrixEmployeeCategoryFilter(item),
-      })),
-      ...resignationProbabilityFilters.map((item) => ({
-        id: `resignation-probability-${item}`,
-        label: `Вероятность увольнения: ${
-          RESIGNATION_PROBABILITY_OPTIONS.find((option) => option.value === item)?.label ?? item
-        }`,
-        onClear: () => clearMatrixResignationProbabilityFilter(item),
-      })),
-      ...salaryMarketFilters.map((item) => ({
-        id: `salary-${item}`,
-        label: `З/П к рынку: ${SALARY_MARKET_LEVEL_LABELS[item]}`,
-        onClear: () => clearMatrixSalaryFilter(item),
-      })),
-      ...fkrStatusFilters.map((item) => ({
-        id: `fkr-${item}`,
-        label: `ФКР: ${FKR_STATUS_LABELS[item]}`,
-        onClear: () => clearMatrixFkrFilter(item),
-      })),
-      ...(overtimeFilter !== "all"
-        ? [
-            {
-              id: "overtime",
-              label: `Переработки: ${overtimeFilter === "yes" ? "ДА" : "НЕТ"}`,
-              onClear: clearMatrixOvertimeFilters,
-            },
-          ]
-        : []),
-      ...(rhythmAssessmentFilter !== "all"
-        ? [
-            {
-              id: "rhythm",
-              label: `РИТМ: ${
-                RHYTHM_FILTER_OPTIONS.find((item) => item.value === rhythmAssessmentFilter)?.label ?? ""
-              }`,
-              onClear: clearMatrixRhythmFilter,
-            },
-          ]
-        : []),
-      ...(externalAssessmentFilter !== "all"
-        ? [
-            {
-              id: "external",
-              label: `Внешняя оценка: ${
-                EXTERNAL_FILTER_OPTIONS.find((item) => item.value === externalAssessmentFilter)?.label ?? ""
-              }`,
-              onClear: clearMatrixExternalFilter,
-            },
-          ]
-        : []),
-      ...surveyResultFilters.map((item) => ({
-        id: `survey-result-${item}`,
-        label: `Опрос: результат ${SURVEY_CATEGORY_LABELS[item]}`,
-        onClear: () => clearMatrixSurveyResultFilter(item),
-      })),
-      ...surveyInteractionFilters.map((item) => ({
-        id: `survey-team-${item}`,
-        label: `Опрос: команда ${SURVEY_CATEGORY_LABELS[item]}`,
-        onClear: () => clearMatrixSurveyInteractionFilter(item),
-      })),
-    ],
-    [
-      selectedUnitTags,
-      selectedPositionIds,
-      fioFilterQuery,
-      criticalityFilters,
-      showNotFormedCriticalityFilter,
-      employeeCategoryFilters,
-      resignationProbabilityFilters,
-      salaryMarketFilters,
-      fkrStatusFilters,
-      overtimeFilter,
-      rhythmAssessmentFilter,
-      externalAssessmentFilter,
-      surveyResultFilters,
-      surveyInteractionFilters,
-    ]
-  )
+  const { teamMatrixFilterTags } = useTeamMatrixFilters({
+    selectedUnitTags,
+    selectedPositionIds,
+    fioFilterQuery,
+    criticalityFilters,
+    showNotFormedCriticalityFilter,
+    employeeCategoryFilters,
+    resignationProbabilityFilters,
+    salaryMarketFilters,
+    fkrStatusFilters,
+    overtimeFilter,
+    rhythmAssessmentFilter,
+    externalAssessmentFilter,
+    surveyResultFilters,
+    surveyInteractionFilters,
+    setSelectedUnitIds,
+    setFioFilterQuery,
+    setSelectedPositionIds,
+    setSalaryMarketFilters,
+    setEmployeeCategoryFilters,
+    setResignationProbabilityFilters,
+    setFkrStatusFilters,
+    setOvertimeFilter,
+    setRhythmAssessmentFilter,
+    setExternalAssessmentFilter,
+    setSurveyResultFilters,
+    setSurveyInteractionFilters,
+    setCriticalityFilters,
+    setShowNotFormedCriticalityFilter,
+    setStaffPage,
+    setNineBoxCellDetail,
+  })
 
   const toggleSelectedUnit = (unitId: string) => {
     setSelectedUnitIds((prev) =>
@@ -833,17 +616,6 @@ export default function AssessmentPage() {
     resetSelectedUnits()
     setStaffPage(1)
     setNineBoxCellDetail(null)
-  }
-
-  function clearNotFormedCriticalityFilter() {
-    setShowNotFormedCriticalityFilter(false)
-    setStaffPage(1)
-    setNineBoxCellDetail(null)
-  }
-
-  function clearMatrixCriticalityFilter(value: AssessmentGradeLevel) {
-    setCriticalityFilters((prev) => prev.filter((item) => item !== value))
-    resetFiltersForMatrix()
   }
 
   const handleAssessmentBadgeFilter = (grade: AssessmentGradeLevel) => {
@@ -1694,7 +1466,6 @@ export default function AssessmentPage() {
               onSelectStaff={setSelectedStaffMember}
               onOpenNotebook={openStaffNotebook}
               totalStaffItems={totalStaffItems}
-              staffPage={staffPage}
               staffPages={staffPages}
               safeStaffPage={safeStaffPage}
               staffPageSize={staffPageSize}
@@ -1715,406 +1486,26 @@ export default function AssessmentPage() {
               selectedStaffSurveyResult={selectedStaffSurveyResult}
               selectedStaffSurveyTeam={selectedStaffSurveyTeam}
             />
-            <Sheet
+            <TeamMatrixSheet
               open={isNineBoxOpen}
               onOpenChange={(open) => {
                 setIsNineBoxOpen(open)
                 if (!open) setNineBoxCellDetail(null)
               }}
-            >
-              <SheetContent
-                side="bottom"
-                showCloseButton={true}
-                className="!w-full !max-w-full !h-[85vh] border-t border-border bg-card"
-              >
-                <SheetHeader className="border-b border-border px-6 py-4">
-                  <SheetTitle
-                    className={`text-base font-semibold tracking-wide md:text-lg ${
-                      teamMatrixMode === "survey-nine-box"
-                        ? "text-amber-700 dark:text-amber-200"
-                        : "text-violet-700 dark:text-violet-200"
-                    }`}
-                  >
-                    <span className="font-black uppercase tracking-[0.2em]">
-                      {teamMatrixMode === "survey-nine-box" ? "9-box" : "12-box"}
-                    </span>
-                    {" "}
-                    <span className="font-medium normal-case">
-                      {teamMatrixMode === "survey-nine-box"
-                        ? "результаты опроса"
-                        : "результаты оценки руководителя"}
-                    </span>
-                  </SheetTitle>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {teamMatrixFilterTags.map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm uppercase text-foreground"
-                      >
-                        <span className="min-w-0 truncate">{tag.label}</span>
-                        {tag.onClear ? (
-                          <button
-                            type="button"
-                            className="cursor-pointer rounded-sm px-1 text-muted-foreground hover:bg-background hover:text-foreground"
-                            aria-label={`Убрать фильтр: ${tag.label}`}
-                            onPointerDown={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              tag.onClear?.()
-                            }}
-                          >
-                            x
-                          </button>
-                        ) : null}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-sm text-foreground">Сотрудников в выборке:</span>
-                    <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-border bg-muted px-2 py-1 text-sm font-bold uppercase text-foreground">
-                      {teamMatrixEmployeeStats.totalInMatrix}
-                    </span>
-                    {teamMatrixMode === "manager-twelve-box" ? (
-                      <>
-                        <span className="text-sm text-foreground">Оценены (категория+вероятность)</span>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-border bg-muted px-2 py-1 text-sm font-bold uppercase text-foreground">
-                              {teamMatrixEmployeeStats.evaluatedByBoth}
-                            </span>
-                          </TooltipTrigger>
-                            <StructuredTooltipContent
-                              title="Оценены (категория+вероятность)"
-                              description="Сотрудники с заполненными значениями категории и вероятности увольнения."
-                            >
-                              <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                                {teamMatrixEmployeeStats.evaluatedMembers.length ? (
-                                  teamMatrixEmployeeStats.evaluatedMembers.slice(0, 10).map((member) => (
-                                    <div key={member.id}>
-                                      <div className="font-medium">
-                                        {formatFioMember(member)}
-                                      </div>
-                                      <div className="text-sm text-muted-foreground">{member.position}</div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="text-sm text-muted-foreground">Нет оцененных сотрудников</div>
-                                )}
-                                {teamMatrixEmployeeStats.evaluatedMembers.length > 10 ? (
-                                  <div className="pt-1 text-sm text-muted-foreground">
-                                    ... еще {teamMatrixEmployeeStats.evaluatedMembers.length - 10}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </StructuredTooltipContent>
-                        </Tooltip>
-                        <span className="text-sm text-foreground">Не оценены</span>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-border bg-muted px-2 py-1 text-sm font-bold uppercase text-foreground">
-                              {teamMatrixEmployeeStats.notEvaluated}
-                            </span>
-                          </TooltipTrigger>
-                            <StructuredTooltipContent
-                              title="Не оценены"
-                              description="Сотрудники без полного ввода категории сотрудника или вероятности увольнения."
-                            >
-                              <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                                {teamMatrixEmployeeStats.notEvaluatedMembers.length ? (
-                                  teamMatrixEmployeeStats.notEvaluatedMembers.slice(0, 10).map((member) => (
-                                    <div key={member.id}>
-                                      <div className="font-medium">
-                                        {formatFioMember(member)}
-                                      </div>
-                                      <div className="text-sm text-muted-foreground">{member.position}</div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="text-sm text-muted-foreground">Нет неоцененных сотрудников</div>
-                                )}
-                                {teamMatrixEmployeeStats.notEvaluatedMembers.length > 10 ? (
-                                  <div className="pt-1 text-sm text-muted-foreground">
-                                    ... еще {teamMatrixEmployeeStats.notEvaluatedMembers.length - 10}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </StructuredTooltipContent>
-                        </Tooltip>
-                      </>
-                    ) : null}
-                  </div>
-                </SheetHeader>
-                <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-4 py-5">
-                  <div className="grid grid-cols-[48px_1fr] gap-4">
-                    <div className="relative flex">
-                      <div className="absolute left-1/2 top-1/2 flex w-10 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-between py-2">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="28"
-                          height="28"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          strokeWidth="2.2"
-                          stroke="currentColor"
-                          className="text-muted-foreground"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M12 20V4M9 7l3-3 3 3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        <span className="rotate-180 [writing-mode:vertical-rl] text-base font-semibold tracking-wide text-muted-foreground">
-                          {teamMatrixConfig.yLabel}
-                        </span>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="28"
-                          height="28"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          strokeWidth="2.2"
-                          stroke="currentColor"
-                          className="text-muted-foreground"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M12 4V20M9 17l3 3 3-3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="grid gap-4">
-                    {teamMatrixRows.map((row, yIndex) => (
-                        <div
-                          key={yIndex}
-                          className={`grid min-h-[176px] ${
-                            teamMatrixColumnCount === 4
-                              ? "grid-cols-[46px_repeat(4,minmax(0,1fr))]"
-                              : "grid-cols-[46px_repeat(3,minmax(0,1fr))]"
-                          } gap-3`}
-                        >
-                          <div className="flex items-center justify-center px-1 text-sm font-semibold text-muted-foreground">
-                            {teamMatrixConfig.y[
-                              isManagerTwelveBox ? yIndex : teamMatrixRowCount - 1 - yIndex
-                            ]}
-                          </div>
-                          {row.map((index) => {
-                            const bucket = nineBoxBuckets[index]
-                            const x = index % teamMatrixColumnCount
-                            const cellMatrixGrade: AssessmentGradeLevel | null = isManagerTwelveBox
-                              ? getManagerTwelveBoxCellGrade(x, yIndex)
-                              : null
-                            const cellToneClass =
-                              cellMatrixGrade !== null
-                                ? CRITICALITY_LEVEL_CLASSES[cellMatrixGrade]
-                                : getTeamMatrixCellTone(
-                                    x,
-                                    yIndex,
-                                    teamMatrixRowCount,
-                                    teamMatrixMode
-                                  )
-                            return (
-                              <div
-                                key={index}
-                                className={cn(
-                                  "@container/matrix-cell relative min-h-[160px] overflow-hidden rounded-lg p-2 shadow-sm ring-1 ring-border/25 [container-type:size]",
-                                  cellToneClass
-                                )}
-                              >
-                                {cellMatrixGrade ? (
-                                  <div
-                                    className="pointer-events-none absolute inset-2.5 z-0 flex select-none items-center justify-center"
-                                    aria-hidden
-                                  >
-                                    <span
-                                      className="max-h-full w-full text-center font-bold leading-none text-foreground/[0.08] dark:text-foreground/[0.06]"
-                                      style={{
-                                        fontSize: "min(10.5rem, 85cqh)",
-                                        maxHeight: "100%",
-                                      }}
-                                    >
-                                      {CRITICALITY_LEVEL_LABELS[cellMatrixGrade]}
-                                    </span>
-                                  </div>
-                                ) : null}
-                                <span className="absolute right-2 top-2 z-10 inline-flex min-w-7 items-center justify-center rounded-full border-2 border-white/80 bg-slate-950/10 px-2.5 py-1 text-sm font-semibold uppercase text-slate-900 shadow-sm backdrop-blur-sm dark:bg-white/10 dark:text-foreground">
-                                  <Users size={13} className="mr-1" />
-                                  {bucket.length}
-                                </span>
-                                <div className="relative z-10 pt-8" />
-                                <div className="relative z-10 flex flex-wrap gap-3.5">
-                                  {bucket.map((member) => {
-                                    const currentSalaryMarketLevel = getEffectiveSalaryMarketLevel(
-                                      member,
-                                      salaryMarketLevelOverrides
-                                    )
-                                    const category =
-                                      employeeCategoryOverrides[member.id] ??
-                                      getEmployeeCategory(member, currentSalaryMarketLevel)
-                                    const probability =
-                                      resignationProbabilityOverrides[member.id] ??
-                                      getResignationProbability(member, currentSalaryMarketLevel)
-                                    const needsEvaluation =
-                                      category === "not-evaluated" || probability === "not-evaluated"
-
-                                    const surveyResult =
-                                      member.surveyResultCategory ?? "middle"
-                                    const surveyTeam =
-                                      member.surveyInteractionCategory ?? "middle"
-
-                                    return (
-                                      <HoverCard
-                                        key={member.id}
-                                        openDelay={150}
-                                        closeDelay={100}
-                                      >
-                                        <HoverCardTrigger asChild>
-                                          <button
-                                            type="button"
-                                            className="flex w-24 max-w-full flex-col items-center gap-2.5 rounded-md border-0 bg-transparent p-0 text-inherit outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                          >
-                                            <span className="inline-flex">
-                                              <MiniAvatar member={member} />
-                                            </span>
-                                            <span className="w-full text-center text-sm font-semibold leading-snug text-foreground">
-                                              {member.lastName} {member.firstName}
-                                            </span>
-                                          </button>
-                                        </HoverCardTrigger>
-                                        <HoverCardContent
-                                          side="top"
-                                          align="center"
-                                          className="w-72 p-0 text-sm"
-                                        >
-                                          <div className="space-y-3 p-3">
-                                            {needsEvaluation ? (
-                                              <p className="text-sm text-amber-800 dark:text-amber-300/90">
-                                                Для попадания в 12×box: заполните категорию
-                                                сотрудника и вероятность увольнения.
-                                              </p>
-                                            ) : null}
-                                            <div className="space-y-1">
-                                              <p className="text-sm font-medium text-muted-foreground">
-                                                Опрос: вклад в достижение результатов
-                                              </p>
-                                              <p className="font-medium text-foreground">
-                                                {SURVEY_CATEGORY_LABELS[surveyResult]}
-                                              </p>
-                                            </div>
-                                            <div className="space-y-1">
-                                              <p className="text-sm font-medium text-muted-foreground">
-                                                Опрос: командное взаимодействие
-                                              </p>
-                                              <p className="font-medium text-foreground">
-                                                {SURVEY_CATEGORY_LABELS[surveyTeam]}
-                                              </p>
-                                            </div>
-                                          </div>
-                                          <Separator />
-                                          <div className="p-2">
-                                            <Button
-                                              type="button"
-                                              variant="secondary"
-                                              className="w-full"
-                                              size="sm"
-                                              onClick={() =>
-                                                setSelectedStaffMember(member)
-                                              }
-                                            >
-                                              Информация о сотруднике
-                                            </Button>
-                                          </div>
-                                        </HoverCardContent>
-                                      </HoverCard>
-                                    )
-                                  })}
-                                  {bucket.length === 0 ? (
-                                    <span className="text-base text-muted-foreground">Нет сотрудников</span>
-                                  ) : null}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid gap-3">
-                    <div
-                      className={`grid gap-2 px-1 ${
-                        teamMatrixColumnCount === 4
-                          ? "grid-cols-[48px_repeat(4,minmax(0,1fr))]"
-                          : "grid-cols-[48px_repeat(3,minmax(0,1fr))]"
-                      }`}
-                    >
-                      <div />
-                      {teamMatrixConfig.x.map((label) => (
-                        <div
-                          key={label}
-                          className="text-center text-sm font-semibold tracking-wide text-muted-foreground"
-                        >
-                          {label}
-                        </div>
-                      ))}
-                    </div>
-                    <div
-                      className={`grid gap-2 px-1 ${
-                        teamMatrixColumnCount === 4
-                          ? "grid-cols-[48px_repeat(4,minmax(0,1fr))]"
-                          : "grid-cols-[48px_repeat(3,minmax(0,1fr))]"
-                      }`}
-                    >
-                      <div />
-                      <div
-                        className={`flex items-center justify-center gap-2 text-center text-base font-semibold tracking-wide text-muted-foreground ${
-                          teamMatrixColumnCount === 4 ? "col-span-4" : "col-span-3"
-                        }`}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="28"
-                          height="28"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          strokeWidth="2.2"
-                          stroke="currentColor"
-                          className="text-muted-foreground"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M20 12H4M7 9l-3 3 3 3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        {teamMatrixConfig.xLabel}
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="28"
-                          height="28"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          strokeWidth="2.2"
-                          stroke="currentColor"
-                          className="text-muted-foreground"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M4 12h16M17 9l3 3-3 3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
+              teamMatrixMode={teamMatrixMode}
+              teamMatrixConfig={teamMatrixConfig}
+              teamMatrixFilterTags={teamMatrixFilterTags}
+              teamMatrixEmployeeStats={teamMatrixEmployeeStats}
+              teamMatrixRows={teamMatrixRows}
+              teamMatrixColumnCount={teamMatrixColumnCount}
+              teamMatrixRowCount={teamMatrixRowCount}
+              isManagerTwelveBox={isManagerTwelveBox}
+              nineBoxBuckets={nineBoxBuckets}
+              salaryMarketLevelOverrides={salaryMarketLevelOverrides}
+              employeeCategoryOverrides={employeeCategoryOverrides}
+              resignationProbabilityOverrides={resignationProbabilityOverrides}
+              onSelectStaff={setSelectedStaffMember}
+            />
             <Dialog
               open={nineBoxCellDetail !== null}
               onOpenChange={(open) => {

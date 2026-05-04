@@ -18,7 +18,7 @@ import { StaffMemberAvatar } from "@/components/staff-member-avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HomeTeamAssessment } from "@/components/home-team-assessment"
 import type { StaffMember } from "@/lib/bank-org-mock"
-import { formatFioMember, unitHeadTagClass } from "@/lib/staff-presentation"
+import { formatFioMember } from "@/lib/staff-presentation"
 import { cn } from "@/lib/utils"
 
 export type HomeSectionLink = {

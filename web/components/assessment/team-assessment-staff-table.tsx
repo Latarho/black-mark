@@ -39,7 +39,6 @@ import {
   SURVEY_CATEGORY_LABELS,
   TABLE_TAG_TEXT_CLASS,
   getAssessmentGrade,
-  getEffectiveSalaryMarketLevel,
   getEmployeeCategory,
   getResignationProbability,
   hasRequiredAssessment,
@@ -93,7 +92,6 @@ export type TeamAssessmentStaffTableProps = {
   onSelectStaff: (member: StaffMember) => void
   onOpenNotebook: (member: StaffMember) => void
   totalStaffItems: number
-  staffPage: number
   staffPages: number
   safeStaffPage: number
   staffPageSize: number
@@ -114,7 +112,6 @@ export function TeamAssessmentStaffTable({
   onSelectStaff,
   onOpenNotebook,
   totalStaffItems,
-  staffPage,
   staffPages,
   safeStaffPage,
   staffPageSize,

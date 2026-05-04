@@ -64,8 +64,7 @@ export function D3OrgChartView() {
   const searchWrapRef = React.useRef<HTMLDivElement>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
-
-  const chartData = React.useMemo(() => buildD3OrgChartRows(), [isDark])
+  const chartData = React.useMemo(() => buildD3OrgChartRows(), [])
 
   const [search, setSearch] = React.useState("")
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -349,7 +348,7 @@ export function D3OrgChartView() {
                 ) : (
                   <ul className="flex flex-col gap-0 p-1">
                     {matches.map((row) => (
-                      <li key={row.id} role="option">
+                      <li key={row.id} role="option" aria-selected={false}>
                         <Button
                           type="button"
                           variant="ghost"
