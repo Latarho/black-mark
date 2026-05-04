@@ -1,6 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "installCommand": "npm ci",
-  "buildCommand": "if [ -f next.config.mjs ] && [ -f package.json ]; then npm run build; elif [ -f web/next.config.mjs ] && [ -f web/package.json ]; then cd web && npm run build; else npm run build; fi"
-}
