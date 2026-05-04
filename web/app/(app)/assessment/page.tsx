@@ -36,8 +36,8 @@ import {
   SlidersHorizontalIcon,
   XIcon,
 } from "lucide-react"
-import { useSearchParams } from "next/navigation"
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import {
   CRITICALITY_FILTER_OPTIONS,
   CRITICALITY_LEVEL_LABELS,
@@ -55,15 +55,15 @@ import {
   TEAM_MATRIX_AXIS_LABELS,
   TEAM_MATRIX_OPTIONS,
   formatNotebookDateTime,
-  getAssessmentGrade,
   getAssessmentGradeForMember,
-  getEffectiveSalaryMarketLevel,
+  getAssessmentGrade,
   getEmployeeCategory,
-  getMatrixCellRows,
+  getEffectiveSalaryMarketLevel,
   getResignationProbability,
+  getMatrixCellRows,
+  isFullyAssessedForManagerMatrix,
   hasOvertime,
   hasRequiredAssessment,
-  isFullyAssessedForManagerMatrix,
   makeNineBoxBuckets,
   type AssessmentGradeLevel,
   type EmployeeCategoryLevel,
@@ -97,7 +97,16 @@ function AssessmentTabQuerySync({
 }
 
 export default function AssessmentPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [assessmentTab, setAssessmentTab] = useState<"mine" | "team">("mine")
+  const updateAssessmentTab = (nextTab: "mine" | "team") => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", nextTab)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    setAssessmentTab(nextTab)
+  }
 
   const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([])
   const [staffSearchQuery, setStaffSearchQuery] = useState("")
@@ -181,8 +190,7 @@ export default function AssessmentPage() {
         .toLowerCase()
 
       const currentSalaryMarketLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
-      const currentCategory =
-        employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, currentSalaryMarketLevel)
+      const currentCategory = employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, currentSalaryMarketLevel)
       const currentProbability =
         resignationProbabilityOverrides[member.id] ?? getResignationProbability(member, currentSalaryMarketLevel)
       const { isFormed: hasCriticality } = hasRequiredAssessment(currentCategory, currentProbability)
@@ -262,8 +270,7 @@ export default function AssessmentPage() {
       const searchText = [fio, member.position, unitPath].join(" ").toLowerCase()
 
       const currentSalaryMarketLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
-      const currentCategory =
-        employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, currentSalaryMarketLevel)
+      const currentCategory = employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, currentSalaryMarketLevel)
       const currentProbability =
         resignationProbabilityOverrides[member.id] ?? getResignationProbability(member, currentSalaryMarketLevel)
       const currentFkrStatus: FkrStatus = member.fkrStatus ?? "not-included"
@@ -343,8 +350,7 @@ export default function AssessmentPage() {
     filteredStaffForGradeSummary.forEach((member) => {
       const salaryLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
       const category = employeeCategoryOverrides[member.id] ?? getEmployeeCategory(member, salaryLevel)
-      const probability =
-        resignationProbabilityOverrides[member.id] ?? getResignationProbability(member, salaryLevel)
+      const probability = resignationProbabilityOverrides[member.id] ?? getResignationProbability(member, salaryLevel)
       const { isFormed } = hasRequiredAssessment(category, probability)
       const grade = isFormed ? getAssessmentGrade(category, probability) : "not-formed"
 
@@ -475,7 +481,7 @@ export default function AssessmentPage() {
         teamMatrixMode,
         salaryMarketLevelOverrides,
         employeeCategoryOverrides,
-        resignationProbabilityOverrides
+        resignationProbabilityOverrides,
       ),
     [
       filteredStaff,
@@ -494,14 +500,14 @@ export default function AssessmentPage() {
 
       filteredStaff.forEach((member) => {
         const salaryLevel = getEffectiveSalaryMarketLevel(member, salaryMarketLevelOverrides)
-        const isAssessed = isFullyAssessedForManagerMatrix(
+        const isAssessedByPeriod = isFullyAssessedForManagerMatrix(
           member,
           salaryLevel,
           employeeCategoryOverrides,
           resignationProbabilityOverrides
         )
 
-        if (isAssessed) {
+        if (isAssessedByPeriod) {
           evaluatedMembers.push(member)
         } else {
           notEvaluatedMembers.push(member)
@@ -642,11 +648,13 @@ export default function AssessmentPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pt-4">
       <Suspense fallback={null}>
-        <AssessmentTabQuerySync setTab={setAssessmentTab} />
+        <AssessmentTabQuerySync
+          setTab={setAssessmentTab}
+        />
       </Suspense>
       <Tabs
         value={assessmentTab}
-        onValueChange={(value) => setAssessmentTab(value as "mine" | "team")}
+        onValueChange={(value) => updateAssessmentTab(value as "mine" | "team")}
         className="flex w-full flex-1 flex-col gap-4"
       >
         <TabsList className="group-data-horizontal/tabs:h-8 flex h-8 w-full overflow-hidden rounded-lg border border-border bg-muted p-px divide-x divide-border">

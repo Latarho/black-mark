@@ -100,12 +100,6 @@ export function CriticalityTag({ level }: { level: AssessmentGradeLevel }) {
   )
 }
 
-export type StaffYearAssessmentSlide = {
-  year: number
-  isFormed: boolean
-  grade: AssessmentGradeLevel | null
-}
-
 interface StaffAssessmentDetailModalProps {
   selectedStaffMember: StaffMember | null
   setSelectedStaffMember: (member: StaffMember | null) => void
@@ -115,8 +109,6 @@ interface StaffAssessmentDetailModalProps {
   selectedStaffFkrStatus: FkrStatus
   selectedStaffSurveyResult: SurveyCategoryLevel
   selectedStaffSurveyTeam: SurveyCategoryLevel
-  /** Если задано, карусель показывает оценку по каждому году; иначе — демо-вид «2026 / 2025». */
-  yearAssessmentSlides?: StaffYearAssessmentSlide[] | null
 }
 
 export function StaffAssessmentDetailModal({
@@ -128,7 +120,6 @@ export function StaffAssessmentDetailModal({
   selectedStaffFkrStatus,
   selectedStaffSurveyResult,
   selectedStaffSurveyTeam,
-  yearAssessmentSlides = null,
 }: StaffAssessmentDetailModalProps) {
   return (
     <Dialog
@@ -179,90 +170,26 @@ export function StaffAssessmentDetailModal({
                       opts={{ align: "center", loop: false }}
                     >
                       <CarouselContent>
-                        {yearAssessmentSlides && yearAssessmentSlides.length > 0 ? (
-                          yearAssessmentSlides.map((slide) => (
-                            <CarouselItem key={slide.year}>
-                              <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center">
-                                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                                  Результат оценки
-                                </p>
-                                <p
-                                  className={cn(
-                                    "text-sm font-medium uppercase tracking-wide",
-                                    slide.year === yearAssessmentSlides[0]?.year
-                                      ? "text-primary"
-                                      : "text-muted-foreground"
-                                  )}
-                                >
-                                  Период оценки · {slide.year}
-                                </p>
-                                {slide.isFormed && slide.grade ? (
-                                  <span
-                                    className={cn(
-                                      "text-[clamp(3.5rem,10vw+2.5rem,6.5rem)] font-black leading-none tracking-tight",
-                                      CRITICALITY_LETTER_TEXT_CLASSES[slide.grade]
-                                    )}
-                                    role="img"
-                                    aria-label={`Результат оценки за ${slide.year}: ${CRITICALITY_LEVEL_LABELS[slide.grade]}`}
-                                  >
-                                    {CRITICALITY_LEVEL_LABELS[slide.grade]}
-                                  </span>
-                                ) : (
-                                  <span
-                                    className="text-[clamp(2.5rem,8vw+1.5rem,4rem)] font-black leading-none tracking-tight text-muted-foreground"
-                                    role="img"
-                                    aria-label={`Оценка за ${slide.year} не сформирована`}
-                                  >
-                                    —
-                                  </span>
-                                )}
-                              </div>
-                            </CarouselItem>
-                          ))
-                        ) : (
-                          <>
-                            <CarouselItem>
-                              <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center">
-                                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                                  Результат оценки
-                                </p>
-                                <p className="text-sm font-medium uppercase tracking-wide text-primary">
-                                  Текущий · 2026
-                                </p>
-                                <span
-                                  className={cn(
-                                    "text-[clamp(3.5rem,10vw+2.5rem,6.5rem)] font-black leading-none tracking-tight",
-                                    CRITICALITY_LETTER_TEXT_CLASSES[selectedStaffCriticality]
-                                  )}
-                                  role="img"
-                                  aria-label={`Результат оценки: ${CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}`}
-                                >
-                                  {CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}
-                                </span>
-                              </div>
-                            </CarouselItem>
-                            <CarouselItem>
-                              <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center">
-                                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                                  Результат оценки
-                                </p>
-                                <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                                  2025
-                                </p>
-                                <span
-                                  className={cn(
-                                    "text-[clamp(3.5rem,10vw+2.5rem,6.5rem)] font-black leading-none tracking-tight",
-                                    CRITICALITY_LETTER_TEXT_CLASSES[selectedStaffCriticality]
-                                  )}
-                                  role="img"
-                                  aria-label={`Результат оценки за 2025 год: ${CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}`}
-                                >
-                                  {CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}
-                                </span>
-                              </div>
-                            </CarouselItem>
-                          </>
-                        )}
+                        <CarouselItem>
+                          <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center">
+                            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                              Результат оценки
+                            </p>
+                            <p className="text-sm font-medium uppercase tracking-wide text-primary">
+                              Текущий
+                            </p>
+                            <span
+                              className={cn(
+                                "text-[clamp(3.5rem,10vw+2.5rem,6.5rem)] font-black leading-none tracking-tight",
+                                CRITICALITY_LETTER_TEXT_CLASSES[selectedStaffCriticality]
+                              )}
+                              role="img"
+                              aria-label={`Результат оценки: ${CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}`}
+                            >
+                              {CRITICALITY_LEVEL_LABELS[selectedStaffCriticality]}
+                            </span>
+                          </div>
+                        </CarouselItem>
                       </CarouselContent>
                       <CarouselPrevious
                         className="left-0"

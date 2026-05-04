@@ -123,25 +123,10 @@ export interface StaffMember {
   managerEmployeeCategory?: "key" | "core" | "second-chance" | "ineffective" | "not-evaluated"
   /** Тестовая демонстрационная оценка сотрудника для 12-box: вероятность увольнения */
   managerResignationProbability?: "low" | "medium" | "high" | "not-evaluated"
-  /**
-   * Категория и риск по периоду оценки (календарный год, например 2025 / 2026).
-   * Если для года записи нет, в интерфейсе используются поля managerEmployeeCategory / managerResignationProbability.
-   */
-  managerAssessmentByYear?: Partial<
-    Record<
-      number,
-      {
-        category: NonNullable<StaffMember["managerEmployeeCategory"]>
-        probability: NonNullable<StaffMember["managerResignationProbability"]>
-      }
-    >
-  >
   /** Человекочитаемо, напр. «9 октября» */
   birthday?: string
   /** URL фото для аватара (статичный путь в /public) */
   avatarUrl?: string
-  /** Календарный год периода оценки для отображаемого результата (например 2025 или 2026) */
-  assessmentCycleYear?: number
   contacts?: {
     workEmail: string
     cityPhone: string
@@ -216,7 +201,6 @@ function demoProfileForStaff(
   | "criticalitySituation"
   | "managerEmployeeCategory"
   | "managerResignationProbability"
-  | "managerAssessmentByYear"
   | "birthday"
   | "contacts"
 > {
@@ -277,11 +261,6 @@ function demoProfileForStaff(
     "medium",
     "high",
   ]
-  const managerAssessmentByYear: NonNullable<StaffMember["managerAssessmentByYear"]> = {
-    2026: { category: managerEmployeeCategory, probability: managerResignationProbability },
-    2025: { category: categoryRot[(h + 1) % 5], probability: probabilityRot[(h + 2) % 4] },
-    2024: { category: categoryRot[(h + 3) % 5], probability: probabilityRot[(h + 1) % 4] },
-  }
   const emailLocal = `user${(h % 90000) + 10000}`
   const tenureParts = [`${years} ${pluralRuYears(years)}`]
   if (months > 0) tenureParts.push(`${months} ${pluralRuMonths(months)}`)
@@ -313,7 +292,6 @@ function demoProfileForStaff(
     criticalitySituation,
     managerEmployeeCategory,
     managerResignationProbability,
-    managerAssessmentByYear,
     birthday: `${day} ${MONTHS_GEN[monthIx]}`,
     contacts: {
       workEmail: `${emailLocal}@corp.bank`,

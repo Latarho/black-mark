@@ -40,8 +40,8 @@ import {
   TABLE_TAG_TEXT_CLASS,
   getAssessmentGrade,
   getEmployeeCategory,
-  getResignationProbability,
   hasRequiredAssessment,
+  getResignationProbability,
   type EmployeeCategoryLevel,
   type FkrStatus,
   type ResignationProbabilityLevel,
@@ -166,8 +166,7 @@ export function TeamAssessmentStaffTable({
             const currentSurveyResultCategory: SurveyCategoryLevel = s.surveyResultCategory ?? "middle"
             const currentSurveyInteractionCategory: SurveyCategoryLevel =
               s.surveyInteractionCategory ?? "middle"
-            const employeeCategory =
-              employeeCategoryOverrides[s.id] ?? getEmployeeCategory(s, currentSalaryMarketLevel)
+            const employeeCategory = employeeCategoryOverrides[s.id] ?? getEmployeeCategory(s, currentSalaryMarketLevel)
             const resignationProbability =
               resignationProbabilityOverrides[s.id] ??
               getResignationProbability(s, currentSalaryMarketLevel)

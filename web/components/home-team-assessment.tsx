@@ -6,7 +6,6 @@ import { ArrowUpRight, CalendarDays, SearchIcon, XIcon } from "lucide-react"
 
 import {
   StaffAssessmentDetailModal,
-  type StaffYearAssessmentSlide,
 } from "@/components/assessment/staff-assessment-detail-modal"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -19,20 +18,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ORG_ROOT, getBreadcrumb, type StaffMember } from "@/lib/bank-org-mock"
-import { ASSESSMENT_CYCLE_YEARS, ASSESSMENT_TEAM_TAB_HREF } from "@/lib/assessment-routes"
+import { ASSESSMENT_TEAM_TAB_HREF } from "@/lib/assessment-routes"
 import {
   ASSESSMENT_GRADE_HINTS,
   CRITICALITY_LEVEL_CLASSES,
   CRITICALITY_LEVEL_LABELS,
   EMPLOYEE_CATEGORY_OPTIONS,
   FKR_TABLE_TAG_CLASS,
+  getAssessmentGrade,
+  getAssessmentGradeForMember,
   RESIGNATION_PROBABILITY_OPTIONS,
   TABLE_TAG_TEXT_CLASS,
-  getAssessmentGrade,
-  getAssessmentGradeForMemberAndYear,
+  getEmployeeCategory,
   getEffectiveSalaryMarketLevel,
-  getEmployeeCategoryForCycleYear,
-  getResignationProbabilityForCycleYear,
+  getResignationProbability,
   getRetentionRiskScore,
   hasRequiredAssessment,
   type AssessmentGradeLevel,
@@ -56,17 +55,17 @@ const NEUTRAL_TABLE_TAG_CLASS = cn(
   FKR_TABLE_TAG_CLASS
 )
 
-function getMemberAssessmentSlice(member: StaffMember, cycleYear: number) {
+function getMemberAssessmentSlice(member: StaffMember) {
   const salaryLevel = getEffectiveSalaryMarketLevel(member, {})
-  const category = getEmployeeCategoryForCycleYear(member, salaryLevel, cycleYear, {})
-  const probability = getResignationProbabilityForCycleYear(member, salaryLevel, cycleYear, {})
+  const category = getEmployeeCategory(member, salaryLevel)
+  const probability = getResignationProbability(member, salaryLevel)
   const { isFormed } = hasRequiredAssessment(category, probability)
   const grade = isFormed ? getAssessmentGrade(category, probability) : null
   return { salaryLevel, category, probability, isFormed, grade }
 }
 
-function memberNeedsAttention(member: StaffMember, cycleYear: number): boolean {
-  const { isFormed, grade, probability } = getMemberAssessmentSlice(member, cycleYear)
+function memberNeedsAttention(member: StaffMember): boolean {
+  const { isFormed, grade, probability } = getMemberAssessmentSlice(member)
   if (!isFormed) return true
   if (grade === "D" || grade === "E") return true
   if (probability === "high") return true
@@ -74,8 +73,8 @@ function memberNeedsAttention(member: StaffMember, cycleYear: number): boolean {
 }
 
 /** Чем выше — тем «тяжелее» ситуация с точки зрения оценки (для сортировки «сначала проблемные»). */
-function executiveConcernScore(member: StaffMember, cycleYear: number): number {
-  const { isFormed, grade } = getMemberAssessmentSlice(member, cycleYear)
+function executiveConcernScore(member: StaffMember): number {
+  const { isFormed, grade } = getMemberAssessmentSlice(member)
   if (!isFormed) return 60
   const byLetter: Record<AssessmentGradeLevel, number> = {
     A: 10,
@@ -94,7 +93,6 @@ export function HomeTeamAssessment({
   team: StaffMember[]
   teamExpanded: StaffMember[]
 }) {
-  const [assessmentYear, setAssessmentYear] = useState<number>(ASSESSMENT_CYCLE_YEARS[0])
   const [staffSearchQuery, setStaffSearchQuery] = useState("")
   const [staffPage, setStaffPage] = useState(1)
   const [staffPageSize, setStaffPageSize] = useState<number>(50)
@@ -138,16 +136,16 @@ export function HomeTeamAssessment({
       "not-formed": 0,
     }
     searchFiltered.forEach((member) => {
-      const { isFormed, grade } = getMemberAssessmentSlice(member, assessmentYear)
+      const { isFormed, grade } = getMemberAssessmentSlice(member)
       if (!isFormed) result["not-formed"] += 1
       else if (grade) result[grade] += 1
     })
     return result
-  }, [searchFiltered, assessmentYear])
+  }, [searchFiltered])
 
   const attentionCount = useMemo(
-    () => searchFiltered.filter((m) => memberNeedsAttention(m, assessmentYear)).length,
-    [searchFiltered, assessmentYear]
+    () => searchFiltered.filter((m) => memberNeedsAttention(m)).length,
+    [searchFiltered]
   )
 
   const sortedFilteredStaff = useMemo(() => {
@@ -158,7 +156,7 @@ export function HomeTeamAssessment({
     } else if (sortMode === "grade_worst") {
       list.sort((a, b) => {
         const diff =
-          executiveConcernScore(b, assessmentYear) - executiveConcernScore(a, assessmentYear)
+          executiveConcernScore(b) - executiveConcernScore(a)
         if (diff !== 0) return diff
         return formatFioMember(a).localeCompare(formatFioMember(b))
       })
@@ -171,7 +169,7 @@ export function HomeTeamAssessment({
       })
     }
     return list
-  }, [searchFiltered, sortMode, assessmentYear])
+  }, [searchFiltered, sortMode])
 
   const totalStaffItems = sortedFilteredStaff.length
   const staffPages = Math.max(1, Math.ceil(totalStaffItems / staffPageSize))
@@ -195,16 +193,8 @@ export function HomeTeamAssessment({
   const selectedStaffFkrStatus: FkrStatus = selectedStaffMember?.fkrStatus ?? "not-included"
 
   const selectedStaffCriticality: AssessmentGradeLevel = selectedStaffMember
-    ? getAssessmentGradeForMemberAndYear(selectedStaffMember, {}, {}, {}, assessmentYear)
+    ? getAssessmentGradeForMember(selectedStaffMember, {}, {}, {})
     : "E"
-
-  const yearAssessmentSlides: StaffYearAssessmentSlide[] | null = useMemo(() => {
-    if (!selectedStaffMember) return null
-    return ASSESSMENT_CYCLE_YEARS.map((year) => {
-      const { isFormed, grade } = getMemberAssessmentSlice(selectedStaffMember, year)
-      return { year, isFormed, grade }
-    })
-  }, [selectedStaffMember])
 
   const selectedStaffSurveyResult = selectedStaffMember?.surveyResultCategory ?? "middle"
   const selectedStaffSurveyTeam = selectedStaffMember?.surveyInteractionCategory ?? "middle"
@@ -274,37 +264,11 @@ export function HomeTeamAssessment({
               <CalendarDays className="size-5" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold uppercase tracking-[0.14em] text-primary">Период оценки</p>
+              <p className="text-sm font-bold uppercase tracking-[0.14em] text-primary">Сводка оценки команды</p>
               <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
-                Распределение, сводка и таблица ниже — для выбранного года.
+                Распределение, сводка и таблица ниже отражают текущие данные по команде.
               </p>
             </div>
-          </div>
-          <div className="w-full shrink-0 sm:w-[min(100%,13rem)]">
-            <Select
-              value={String(assessmentYear)}
-              onValueChange={(v) => {
-                setAssessmentYear(Number(v))
-                setStaffPage(1)
-              }}
-            >
-              <SelectTrigger
-                aria-label="Период оценки"
-                className={cn(
-                  "h-11 w-full border-primary/45 bg-background text-base font-semibold tabular-nums shadow-sm",
-                  "hover:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40"
-                )}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                {ASSESSMENT_CYCLE_YEARS.map((y) => (
-                  <SelectItem key={y} value={String(y)} className="text-base font-medium tabular-nums">
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
@@ -367,9 +331,9 @@ export function HomeTeamAssessment({
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Распределение оценок · {assessmentYear}
-          </span>
+            <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Распределение оценок
+            </span>
           <span className="text-muted-foreground">·</span>
           {gradeOrder.map((key) => {
             const count = gradeDistribution[key]
@@ -412,7 +376,7 @@ export function HomeTeamAssessment({
               <th className="w-[14%] border-x border-border bg-muted/40 px-2 py-2 text-center font-medium text-foreground">
                 <span className="block">Оценка</span>
                 <span className="mt-0.5 block text-sm font-normal normal-case tracking-normal text-muted-foreground">
-                  {assessmentYear}
+                  Текущий период
                 </span>
               </th>
               <th className="w-[21%] px-2 py-2 text-center font-medium">Категория</th>
@@ -425,10 +389,7 @@ export function HomeTeamAssessment({
                 .filter((u) => u.id !== ORG_ROOT.id)
                 .map((u) => u.name)
                 .join(" / ")
-              const { category, probability, isFormed: hasGrade, grade } = getMemberAssessmentSlice(
-                member,
-                assessmentYear
-              )
+              const { category, probability, isFormed: hasGrade, grade } = getMemberAssessmentSlice(member)
               const { missingFields } = hasRequiredAssessment(category, probability)
               const categoryLabel =
                 EMPLOYEE_CATEGORY_OPTIONS.find((o) => o.value === category)?.label ?? "—"
@@ -478,7 +439,7 @@ export function HomeTeamAssessment({
                             <div className="space-y-2">
                               <p className="font-semibold">Результат оценки</p>
                               <p className="text-sm text-muted-foreground">
-                                Рекомендации по удержанию ({assessmentYear}):
+                                Рекомендации по удержанию:
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {ASSESSMENT_GRADE_HINTS[grade]}
@@ -605,7 +566,6 @@ export function HomeTeamAssessment({
         selectedStaffFkrStatus={selectedStaffFkrStatus}
         selectedStaffSurveyResult={selectedStaffSurveyResult}
         selectedStaffSurveyTeam={selectedStaffSurveyTeam}
-        yearAssessmentSlides={yearAssessmentSlides}
       />
     </section>
   )
